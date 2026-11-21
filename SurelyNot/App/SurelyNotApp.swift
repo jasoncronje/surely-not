@@ -45,6 +45,9 @@ struct MainTabView: View {
                 AccountsView(client: client)
             }
         }
+        // The tab bar shrinks out of the way while reading down a screen and
+        // comes back on scrolling up.
+        .tabBarMinimizeBehavior(.onScrollDown)
     }
 }
 
