@@ -107,8 +107,12 @@ final class ChatModel {
     }
 
     private func apply(_ chat: Chat) {
-        bubbles = (chat.messages ?? []).map {
-            Bubble(id: $0.id, isUser: $0.isUser, text: $0.content ?? "")
+        // The server creates the reply before it has any text. Leaving that
+        // out keeps an empty bubble from showing while "Thinking" is on screen.
+        bubbles = (chat.messages ?? []).compactMap { message in
+            let text = message.content ?? ""
+            if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return nil }
+            return Bubble(id: message.id, isUser: message.isUser, text: text)
         }
         isTruncated = chat.isTruncated
         if chat.hasError, !isWaitingForReply {
