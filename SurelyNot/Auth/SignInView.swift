@@ -78,6 +78,11 @@ struct SignInView: View {
                 }
                 .padding(Theme.cardPadding)
                 .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
+                // The keyboard covers the button below, so its return key signs in too.
+                .submitLabel(.go)
+                .onSubmit {
+                    if canSubmit, !isWorking { signIn() }
+                }
 
                 if let message = errorMessage ?? session.notice {
                     Text(message)
