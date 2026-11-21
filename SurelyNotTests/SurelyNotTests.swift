@@ -210,3 +210,140 @@ private func decode<T: Decodable>(_ type: T.Type, _ json: String) throws -> T {
         #expect(detail.totalSpent == nil)
     }
 }
+
+@Suite struct MarkdownTests {
+    @Test func splitsAReplyIntoBlocks() {
+        let blocks = MarkdownBlock.parse("""
+        ## Summary
+        You spent **more** than usual.
+        It was mostly rent.
+
+        | Category | Amount |
+        |---|---:|
+        | Housing | $3,891.70 |
+        | Food | $46.31 |
+
+        - First point
+        - Second point
+        1. Step one
+        2) Step two
+        ---
+        Done.
+        """)
+        #expect(blocks == [
+            .heading("Summary"),
+            .paragraph("You spent **more** than usual.\nIt was mostly rent."),
+            .table(header: ["Category", "Amount"], rows: [["Housing", "$3,891.70"], ["Food", "$46.31"]]),
+            .bullets(["First point", "Second point"]),
+            .numbered(["Step one", "Step two"]),
+            .rule,
+            .paragraph("Done."),
+        ])
+    }
+
+    @Test func keepsTextThatOnlyLooksLikeMarkup() {
+        // Pipes without a divider row are not a table, and "#tag" is not a heading.
+        #expect(MarkdownBlock.parse("| just | pipes |") == [.paragraph("just | pipes")])
+        #expect(MarkdownBlock.parse("#tag and **bold start**") == [.paragraph("#tag and **bold start**")])
+        #expect(MarkdownBlock.parse("") == [])
+    }
+}
+
+@Suite struct PresentationTests {
+    @Test func splitsCentsFromWholeUnits() {
+        #expect(MoneyText.split("$14,824.57") == ("$14,824", ".57"))
+        #expect(MoneyText.split("1.234,50 €").cents == "")
+        #expect(MoneyText.split("14.824,57") == ("14.824", ",57"))
+        #expect(MoneyText.split("¥1,200") == ("¥1,200", ""))
+        #expect(MoneyText.split("–") == ("–", ""))
+    }
+
+    private func spending(total: String, normal: String?, comparable: Bool? = true) throws -> SpendingVsNormal {
+        let normalJSON = normal.map { "\"\($0)\"" } ?? "null"
+        return try decode(SpendingVsNormal.self, """
+        {"currency":"USD","comparable":\(comparable.map(String.init) ?? "null"),"total":"\(total)","normal_total":\(normalJSON),"categories":[]}
+        """)
+    }
+
+    @Test func findingNamesTheGapAndItsBaseline() throws {
+        let over = try #require(SpendingFinding.sentence(for: spending(total: "150", normal: "100")))
+        #expect(over.contains(MoneyFormat.string(50, currency: "USD")))
+        #expect(over.contains("above normal"))
+        let under = try #require(SpendingFinding.sentence(for: spending(total: "60", normal: "100")))
+        #expect(under.contains("below normal"))
+        #expect(SpendingFinding.sentence(for: try spending(total: "102", normal: "100")) == "Net spending is about normal for this point in the month.")
+    }
+
+    @Test func noFindingWithoutSomethingToCompareWith() throws {
+        #expect(SpendingFinding.sentence(for: try spending(total: "150", normal: nil)) == nil)
+        #expect(SpendingFinding.sentence(for: try spending(total: "150", normal: "0")) == nil)
+        #expect(SpendingFinding.sentence(for: try spending(total: "150", normal: "100", comparable: false)) == nil)
+    }
+
+    @Test func balanceChangeJudgesDebtsTheOtherWayRound() {
+        let asset = BalanceChange.describe(from: 100, to: 250, days: 90, currency: "USD", isLiability: false)
+        #expect(asset.direction == .good)
+        #expect(asset.text.hasPrefix("+"))
+        #expect(asset.text.hasSuffix("over the last 90 days"))
+        #expect(BalanceChange.describe(from: 100, to: 250, days: 90, currency: "USD", isLiability: true).direction == .bad)
+        #expect(BalanceChange.describe(from: 250, to: 100, days: 90, currency: "USD", isLiability: true).direction == .good)
+        #expect(BalanceChange.describe(from: 100, to: 100, days: 90, currency: "USD", isLiability: false).direction == .flat)
+    }
+
+    @Test func dayLabelsUseTodayAndDropTheCurrentYear() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let now = try #require(Day.date("2026-11-20"))
+        #expect(Day.display("2026-11-20", now: now, calendar: calendar) == "Today")
+        #expect(Day.display("2026-11-19", now: now, calendar: calendar) == "Yesterday")
+        #expect(!Day.display("2026-11-02", now: now, calendar: calendar).contains("2026"))
+        #expect(Day.display("2025-11-02", now: now, calendar: calendar).contains("2025"))
+        #expect(Day.display("soon", now: now, calendar: calendar) == "soon")
+    }
+
+    @Test func tintReadsHueAndRejectsGreys() throws {
+        let hue = try #require(Tint.hue(ofHex: "#0ea5e9"))
+        #expect(abs(hue - 199) < 2)
+        #expect(Tint.hue(ofHex: "#808080") == nil)
+        #expect(Tint.hue(ofHex: "nope") == nil)
+        #expect(Tint.hue(ofHex: nil) == nil)
+    }
+}
+
+@Suite struct AccountsSummaryTests {
+    private func account(_ id: String, classification: String, cents: Int) -> Account {
+        Account(id: id, name: id, balance: "", balanceCents: cents, currency: "USD",
+                classification: classification, accountType: "credit_card", subtype: nil, status: nil, institutionName: nil)
+    }
+
+    private func sheet(assets: String, liabilities: String) throws -> BalanceSheet {
+        func money(_ amount: String) -> String {
+            "{\"amount\":\"\(amount)\",\"currency\":\"USD\",\"formatted\":\"$\(amount)\"}"
+        }
+        return try decode(BalanceSheet.self, """
+        {"currency":"USD","net_worth":\(money("0")),"assets":\(money(assets)),"liabilities":\(money(liabilities))}
+        """)
+    }
+
+    @Test func usesSureTotalsAndExplainsAGap() throws {
+        let accounts = [
+            account("a", classification: "asset", cents: 10000),
+            account("b", classification: "liability", cents: 5000),
+            account("c", classification: "liability", cents: 2500),
+        ]
+        let summary = AccountsSummary(accounts: accounts, sheet: try sheet(assets: "100.00", liabilities: "50.00"))
+        #expect(summary.debts == "$50.00")
+        let note = try #require(summary.note)
+        #expect(note.contains(MoneyFormat.string(25, currency: "USD")))
+        #expect(note.contains("what you owe"))
+        #expect(!note.contains("what you own"))
+    }
+
+    @Test func noNoteWhenTotalsAgreeAndSumsWithoutASheet() throws {
+        let accounts = [account("a", classification: "asset", cents: 10000), account("b", classification: "liability", cents: 5000)]
+        #expect(AccountsSummary(accounts: accounts, sheet: try sheet(assets: "100.00", liabilities: "50.00")).note == nil)
+        let summed = AccountsSummary(accounts: accounts, sheet: nil)
+        #expect(summed.assets == MoneyFormat.string(100, currency: "USD"))
+        #expect(summed.debts == MoneyFormat.string(50, currency: "USD"))
+    }
+}

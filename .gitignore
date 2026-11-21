@@ -57,3 +57,6 @@ Secrets.xcconfig
 .vscode/
 *.swp
 *~
+
+# Design skill working files
+.taste-skill/

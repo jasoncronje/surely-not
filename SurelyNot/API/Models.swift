@@ -191,6 +191,8 @@ nonisolated struct CashFlow: Decodable, Sendable {
     nonisolated struct SpendingComparison: Decodable, Sendable {
         let currentTotal: String?
         let comparisonTotal: String?
+        /// The last day of the earlier period that `comparisonTotal` runs to.
+        let comparisonEndDate: String?
         let delta: String?
         let current: [DayAmount]?
         let previous: [DayAmount]?

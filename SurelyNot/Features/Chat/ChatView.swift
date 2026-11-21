@@ -124,6 +124,12 @@ struct ChatView: View {
     @FocusState private var composerFocused: Bool
     private let title: String
 
+    private static let starters = [
+        "How much did I spend on food last month?",
+        "What changed most in my spending this month?",
+        "Which subscriptions am I paying for?",
+    ]
+
     init(client: APIClient, chatID: String?, title: String) {
         _model = State(initialValue: ChatModel(client: client, chatID: chatID))
         self.title = title
@@ -131,11 +137,29 @@ struct ChatView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 10) {
+            LazyVStack(alignment: .leading, spacing: 12) {
+                if model.isLoading {
+                    Card {
+                        LoadingLines(count: 4)
+                    }
+                } else if let error = model.loadError {
+                    Card {
+                        Text("Could not load this chat. \(error)")
+                            .font(Theme.small)
+                            .foregroundStyle(Theme.muted)
+                        Button("Try again") {
+                            Task { await model.load() }
+                        }
+                        .font(Theme.smallStrong)
+                        .foregroundStyle(Theme.text)
+                    }
+                } else if model.bubbles.isEmpty {
+                    starterList
+                }
                 if model.isTruncated {
                     Text("This is a long chat. Only its first messages can be shown.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .font(Theme.small)
+                        .foregroundStyle(Theme.muted)
                 }
                 ForEach(model.bubbles) { bubble in
                     BubbleView(bubble: bubble)
@@ -143,48 +167,34 @@ struct ChatView: View {
                 if model.isWaitingForReply {
                     HStack(spacing: 8) {
                         ProgressView()
-                        Text("Thinking…")
-                            .foregroundStyle(.secondary)
-                        Spacer()
+                        Text("Thinking")
+                            .font(Theme.small)
+                            .foregroundStyle(Theme.muted)
                     }
-                    .font(.subheadline)
+                    .padding(.horizontal, 4)
                 }
                 if let error = model.replyError {
                     VStack(alignment: .leading, spacing: 8) {
-                        Label(error, systemImage: "exclamationmark.triangle")
-                            .font(.subheadline)
-                            .foregroundStyle(.red)
+                        Text(error)
+                            .font(Theme.small)
+                            .foregroundStyle(Theme.negative)
                         if model.canRetry {
                             Button("Try again") {
                                 Task { await model.retry() }
                             }
-                            .buttonStyle(.bordered)
+                            .font(Theme.smallStrong)
+                            .foregroundStyle(Theme.text)
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 4)
                 }
             }
-            .padding(16)
+            .padding(.horizontal, Theme.margin)
+            .padding(.vertical, 12)
         }
         .defaultScrollAnchor(.bottom)
         .scrollDismissesKeyboard(.interactively)
-        .overlay {
-            if model.isLoading {
-                ProgressView()
-            } else if let error = model.loadError {
-                ContentUnavailableView(
-                    "Could not load this chat",
-                    systemImage: "exclamationmark.triangle",
-                    description: Text(error)
-                )
-            } else if model.bubbles.isEmpty {
-                ContentUnavailableView(
-                    "Ask about your money",
-                    systemImage: "sparkles",
-                    description: Text("For example: how much did I spend on food last month?")
-                )
-            }
-        }
+        .screenBackground()
         .safeAreaInset(edge: .bottom) {
             composer
         }
@@ -195,56 +205,99 @@ struct ChatView: View {
         .task { await model.load() }
     }
 
+    /// Questions to start from, so a new chat is never a blank page.
+    private var starterList: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Ask about your money")
+                .font(Theme.section)
+                .foregroundStyle(Theme.text)
+                .padding(.horizontal, 4)
+            VStack(spacing: 0) {
+                ForEach(Array(Self.starters.enumerated()), id: \.offset) { index, starter in
+                    if index > 0 {
+                        RowRule().padding(.leading, 16)
+                    }
+                    Button {
+                        send(starter)
+                    } label: {
+                        Text(starter)
+                            .font(Theme.body)
+                            .foregroundStyle(Theme.text)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+                            .padding(.horizontal, 16)
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(RowButtonStyle())
+                }
+            }
+            .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
+            .clipShape(.rect(cornerRadius: Theme.cardRadius))
+        }
+    }
+
+    private var canSend: Bool {
+        !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !model.isWaitingForReply
+    }
+
+    private func send(_ text: String) {
+        draft = ""
+        Task { await model.send(text) }
+    }
+
     private var composer: some View {
         HStack(alignment: .bottom, spacing: 8) {
             TextField("Message", text: $draft, axis: .vertical)
+                .font(Theme.body)
                 .lineLimit(1...5)
                 .focused($composerFocused)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(.background.secondary, in: .rect(cornerRadius: 20))
-            Button("Send", systemImage: "arrow.up.circle.fill") {
-                let text = draft
-                draft = ""
-                Task { await model.send(text) }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Theme.surface, in: .rect(cornerRadius: 22))
+            Button {
+                send(draft)
+            } label: {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Theme.onPrimary)
+                    .frame(width: 44, height: 44)
+                    .background(Theme.primary, in: .circle)
             }
-            .labelStyle(.iconOnly)
-            .font(.system(size: 32))
-            .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.isWaitingForReply)
+            .accessibilityLabel("Send")
+            .disabled(!canSend)
+            .opacity(canSend ? 1 : 0.35)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, Theme.margin)
         .padding(.vertical, 8)
-        .background(.bar)
+        .background(Theme.ground)
     }
 }
 
 private struct BubbleView: View {
     let bubble: ChatModel.Bubble
 
-    /// Replies use Markdown for bold, links and the like. Block layout such as
-    /// tables is shown as plain text.
-    private var text: AttributedString {
-        let options = AttributedString.MarkdownParsingOptions(
-            interpretedSyntax: .inlineOnlyPreservingWhitespace
-        )
-        return (try? AttributedString(markdown: bubble.text, options: options)) ?? AttributedString(bubble.text)
-    }
-
     var body: some View {
-        HStack {
-            if bubble.isUser { Spacer(minLength: 40) }
-            Text(bubble.isUser ? AttributedString(bubble.text) : text)
+        if bubble.isUser {
+            HStack {
+                Spacer(minLength: 48)
+                Text(bubble.text)
+                    .font(Theme.body)
+                    .foregroundStyle(Theme.onPrimary)
+                    .textSelection(.enabled)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Theme.primary, in: .rect(cornerRadius: Theme.cardRadius))
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("You: \(bubble.text)")
+        } else {
+            // Replies take the full width, so their tables have room.
+            MarkdownView(bubble.text)
                 .textSelection(.enabled)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .foregroundStyle(bubble.isUser ? Color.white : Color.primary)
-                .background(
-                    bubble.isUser ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.background.secondary),
-                    in: .rect(cornerRadius: 18)
-                )
-            if !bubble.isUser { Spacer(minLength: 40) }
+                .padding(Theme.cardPadding)
+                .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Assistant: \(bubble.text)")
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(bubble.isUser ? "You: \(bubble.text)" : "Assistant: \(bubble.text)")
     }
 }

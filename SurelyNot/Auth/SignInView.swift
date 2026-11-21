@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SignInView: View {
     private enum Method: String, CaseIterable, Identifiable {
-        case password = "Email"
+        case password = "Email and password"
         case apiKey = "API key"
         var id: Self { self }
     }
@@ -18,22 +18,29 @@ struct SignInView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField("sure.example.com", text: $serverAddress)
-                        .keyboardType(.URL)
-                        .textContentType(.URL)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .accessibilityIdentifier("serverAddress")
-                } header: {
-                    Text("Your Sure server")
-                } footer: {
-                    Text("The address you use to open Sure in a browser.")
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 12) {
+                    ProductMark(size: 44)
+                    Text("Surely Not")
+                        .font(Theme.title)
+                        .foregroundStyle(Theme.text)
+                    Text("Your own Sure server, in a native iPhone app.")
+                        .font(Theme.body)
+                        .foregroundStyle(Theme.muted)
                 }
+                .padding(.top, 32)
 
-                Section {
+                VStack(alignment: .leading, spacing: 16) {
+                    Field(label: "Server address", note: "The address you use to open Sure in a browser.") {
+                        TextField("sure.example.com", text: $serverAddress)
+                            .keyboardType(.URL)
+                            .textContentType(.URL)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .accessibilityIdentifier("serverAddress")
+                    }
+
                     Picker("Sign in with", selection: $method) {
                         ForEach(Method.allCases) { Text($0.rawValue).tag($0) }
                     }
@@ -41,51 +48,66 @@ struct SignInView: View {
 
                     switch method {
                     case .password:
-                        TextField("Email", text: $email)
-                            .keyboardType(.emailAddress)
-                            .textContentType(.username)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                        SecureField("Password", text: $password)
-                            .textContentType(.password)
-                        TextField("Two-factor code (if you use one)", text: $otpCode)
-                            .keyboardType(.numberPad)
-                            .textContentType(.oneTimeCode)
+                        Field(label: "Email") {
+                            TextField("you@example.com", text: $email)
+                                .keyboardType(.emailAddress)
+                                .textContentType(.username)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                        }
+                        Field(label: "Password") {
+                            SecureField("Password", text: $password)
+                                .textContentType(.password)
+                        }
+                        Field(label: "Two-factor code", note: "Only if you have turned on two-factor sign-in.") {
+                            TextField("123456", text: $otpCode)
+                                .keyboardType(.numberPad)
+                                .textContentType(.oneTimeCode)
+                        }
                     case .apiKey:
-                        SecureField("API key", text: $apiKey)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .accessibilityIdentifier("apiKey")
-                    }
-                } footer: {
-                    if method == .apiKey {
-                        Text("Create a key in Sure under Settings, API Key. A read-only key lets you view everything but not add or change anything.")
-                    }
-                }
-
-                if let message = errorMessage ?? session.notice {
-                    Section {
-                        Label(message, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.red)
-                    }
-                }
-
-                Section {
-                    Button(action: signIn) {
-                        HStack {
-                            Text("Sign in")
-                            Spacer()
-                            if isWorking { ProgressView() }
+                        Field(
+                            label: "API key",
+                            note: "Create one in Sure under Settings, API Key. A read-only key lets you see everything but change nothing."
+                        ) {
+                            SecureField("Paste your key", text: $apiKey)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .accessibilityIdentifier("apiKey")
                         }
                     }
-                    .disabled(!canSubmit || isWorking)
-                    .accessibilityIdentifier("signIn")
-                } footer: {
-                    Text("Surely Not is an unofficial app. It is not affiliated with the Sure project.")
                 }
+                .padding(Theme.cardPadding)
+                .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
+
+                if let message = errorMessage ?? session.notice {
+                    Text(message)
+                        .font(Theme.small)
+                        .foregroundStyle(Theme.negative)
+                        .padding(.horizontal, 4)
+                }
+
+                Button(action: signIn) {
+                    HStack(spacing: 8) {
+                        if isWorking {
+                            ProgressView().tint(Theme.onPrimary)
+                        }
+                        Text(isWorking ? "Signing in" : "Sign in")
+                    }
+                }
+                .buttonStyle(PrimaryButtonStyle(fullWidth: true))
+                .disabled(!canSubmit || isWorking)
+                .accessibilityIdentifier("signIn")
+
+                Text("Surely Not is an unofficial app. It is not affiliated with the Sure project.")
+                    .font(Theme.small)
+                    .foregroundStyle(Theme.muted)
+                    .padding(.horizontal, 4)
             }
-            .navigationTitle("Surely Not")
+            .padding(.horizontal, Theme.margin)
+            .padding(.bottom, 24)
         }
+        .scrollDismissesKeyboard(.interactively)
+        .screenBackground()
     }
 
     private var canSubmit: Bool {
@@ -123,6 +145,31 @@ struct SignInView: View {
                 }
             } catch {
                 errorMessage = error.localizedDescription
+            }
+        }
+    }
+}
+
+/// A labelled input: the label above, the field in a grey well, a note below.
+private struct Field<Content: View>: View {
+    let label: String
+    var note: String?
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(label)
+                .font(Theme.smallStrong)
+                .foregroundStyle(Theme.text)
+            content
+                .font(Theme.body)
+                .padding(.horizontal, 14)
+                .frame(minHeight: 48)
+                .background(Theme.ground, in: .rect(cornerRadius: Theme.controlRadius))
+            if let note {
+                Text(note)
+                    .font(Theme.small)
+                    .foregroundStyle(Theme.muted)
             }
         }
     }

@@ -33,6 +33,12 @@ Requires Xcode 26 or later and iOS 26 or later. There are no third-party depende
 
 Open `SurelyNot.xcodeproj` and run the `SurelyNot` scheme.
 
+### Design
+
+The look is defined in `SurelyNot/Support/Theme.swift` and the shared pieces in `SurelyNot/Support/Components.swift`. The rules: colour belongs on data, not on buttons and bars; one blue marks the main thing a screen is about; categories and institutions get a pale tint of their own colour; surfaces are flat with one large corner radius; red is kept for what is over or wrong.
+
+The typeface is [Manrope](https://github.com/sharanda/manrope), bundled in `SurelyNot/Fonts` under the SIL Open Font License (see `OFL.txt` there).
+
 The project file is generated from `project.yml` with [XcodeGen](https://github.com/yonaskolb/XcodeGen). After adding, removing or moving files, run `xcodegen generate` and commit the result.
 
 ## Disclaimer

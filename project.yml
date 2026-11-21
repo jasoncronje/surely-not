@@ -25,6 +25,7 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         ITSAppUsesNonExemptEncryption: false
+        UIAppFonts: [Manrope.ttf]
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
     settings:

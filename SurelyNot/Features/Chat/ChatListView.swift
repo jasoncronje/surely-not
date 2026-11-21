@@ -58,41 +58,39 @@ struct ChatListView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            List {
-                LoadableView(state: model.chats, retry: model.load) { chats in
-                    if chats.isEmpty {
-                        ContentUnavailableView(
-                            "No chats yet",
-                            systemImage: "bubble.left.and.bubble.right",
-                            description: Text("Ask a question about your money to start one.")
-                        )
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.gap) {
+                    ScreenHeader(title: "Chat") {
+                        Button("New chat", systemImage: "plus") {
+                            path.append(.new)
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
                     }
-                    ForEach(chats) { chat in
-                        NavigationLink(value: ChatRoute.existing(id: chat.id, title: chat.title)) {
-                            ChatRow(chat: chat)
-                        }
-                        .swipeActions(edge: .trailing) {
-                            Button("Delete", systemImage: "trash", role: .destructive) {
-                                Task { await model.delete(chat) }
+                    .padding(.top, 8)
+                    LoadableView(state: model.chats, placeholderLines: 4, retry: model.load) { chats in
+                        if chats.isEmpty {
+                            Card {
+                                EmptyNote(text: "No chats yet. Start one to ask about your spending, accounts or budget.")
                             }
-                        }
-                        .contextMenu {
-                            Button("Rename", systemImage: "pencil") {
-                                newTitle = chat.title
-                                renaming = chat
+                        } else {
+                            VStack(spacing: 0) {
+                                ForEach(Array(chats.enumerated()), id: \.element.id) { index, chat in
+                                    if index > 0 {
+                                        RowRule().padding(.leading, 16)
+                                    }
+                                    row(chat)
+                                }
                             }
+                            .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
+                            .clipShape(.rect(cornerRadius: Theme.cardRadius))
                         }
                     }
                 }
+                .padding(.horizontal, Theme.margin)
+                .padding(.bottom, 24)
             }
-            .navigationTitle("Chat")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("New chat", systemImage: "square.and.pencil") {
-                        path.append(.new)
-                    }
-                }
-            }
+            .screenBackground()
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: ChatRoute.self) { route in
                 switch route {
                 case .new:
@@ -123,6 +121,32 @@ struct ChatListView: View {
         }
     }
 
+    private func row(_ chat: Chat) -> some View {
+        HStack(spacing: 4) {
+            NavigationLink(value: ChatRoute.existing(id: chat.id, title: chat.title)) {
+                ChatRow(chat: chat)
+            }
+            .buttonStyle(RowButtonStyle())
+            Menu {
+                Button("Rename", systemImage: "pencil") {
+                    newTitle = chat.title
+                    renaming = chat
+                }
+                Button("Delete", systemImage: "trash", role: .destructive) {
+                    Task { await model.delete(chat) }
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(Theme.muted)
+                    .frame(width: 44, height: 44)
+                    .contentShape(.rect)
+            }
+            .accessibilityLabel("More for \(chat.title)")
+            .padding(.trailing, 4)
+        }
+    }
+
     private var renameShown: Binding<Bool> {
         Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })
     }
@@ -138,18 +162,24 @@ private struct ChatRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(chat.title)
+                .font(Theme.body)
+                .foregroundStyle(Theme.text)
                 .lineLimit(2)
+                .multilineTextAlignment(.leading)
             HStack(spacing: 6) {
                 if let date = chat.lastMessageAt {
                     Text(date, format: .relative(presentation: .named))
+                        .foregroundStyle(Theme.muted)
                 }
                 if chat.hasError {
-                    Label("Failed", systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.red)
+                    Text("Reply failed")
+                        .foregroundStyle(Theme.negative)
                 }
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .font(Theme.small)
         }
+        .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
+        .padding(.leading, 16)
+        .contentShape(.rect)
     }
 }

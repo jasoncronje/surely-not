@@ -57,7 +57,32 @@ final class OverviewModel {
     }
 }
 
+/// The one sentence under the Overview title: how this month's net spending
+/// compares with what is normal for this point in the month.
+///
+/// Sure reports two spending figures. Total spending is everything that went
+/// out. Net spending takes refunds and other money back off each category, and
+/// is the one Sure compares with normal. The app names them differently so
+/// they never read as one number.
+nonisolated enum SpendingFinding {
+    static func sentence(for spending: SpendingVsNormal) -> String? {
+        guard spending.comparable != false,
+              let total = Decimal(string: spending.total),
+              let normalText = spending.normalTotal,
+              let normal = Decimal(string: normalText), normal > 0 else { return nil }
+        let difference = total - normal
+        let amount = MoneyFormat.string(abs(difference), currency: spending.currency)
+        if abs(difference) < normal / 20 {
+            return "Net spending is about normal for this point in the month."
+        }
+        return difference > 0
+            ? "Net spending is \(amount) above normal for this point in the month."
+            : "Net spending is \(amount) below normal for this point in the month."
+    }
+}
+
 struct OverviewView: View {
+    @Environment(Session.self) private var session
     @State private var model: OverviewModel
     @State private var showingSettings = false
 
@@ -68,19 +93,20 @@ struct OverviewView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 16) {
-                    Card(title: "Net worth") {
+                VStack(alignment: .leading, spacing: Theme.gap) {
+                    header
+                    Card {
                         LoadableView(state: model.balanceSheet, retry: model.loadBalanceSheet) { sheet in
                             NetWorthContent(sheet: sheet)
                         }
                     }
-                    Card(title: "This month") {
-                        LoadableView(state: model.cashFlow, retry: model.loadCashFlow) { flow in
+                    Card {
+                        LoadableView(state: model.cashFlow, placeholderLines: 5, retry: model.loadCashFlow) { flow in
                             CashFlowContent(flow: flow)
                         }
                     }
-                    Card(title: "Spending compared with normal") {
-                        LoadableView(state: model.spending, retry: model.loadSpending) { spending in
+                    Card(title: "Against your normal") {
+                        LoadableView(state: model.spending, placeholderLines: 5, retry: model.loadSpending) { spending in
                             SpendingContent(spending: spending)
                         }
                     }
@@ -92,16 +118,11 @@ struct OverviewView: View {
                         }
                     }
                 }
-                .padding(16)
+                .padding(.horizontal, Theme.margin)
+                .padding(.bottom, 24)
             }
-            .navigationTitle("Overview")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Settings", systemImage: "gearshape") {
-                        showingSettings = true
-                    }
-                }
-            }
+            .screenBackground()
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
             }
@@ -115,6 +136,36 @@ struct OverviewView: View {
         }
     }
 
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                ProductMark(size: 22)
+                Text("Surely Not")
+                    .font(Theme.smallStrong)
+                    .foregroundStyle(Theme.text)
+                if let host = session.serverURL?.host() {
+                    Text(host)
+                        .font(Theme.small)
+                        .foregroundStyle(Theme.muted)
+                        .lineLimit(1)
+                }
+            }
+            .accessibilityElement(children: .combine)
+            ScreenHeader(title: "Overview") {
+                Button("Settings", systemImage: "gearshape") {
+                    showingSettings = true
+                }
+                .buttonStyle(IconButtonStyle())
+            }
+            if let spending = model.spending.value, let finding = SpendingFinding.sentence(for: spending) {
+                Text(finding)
+                    .font(Theme.body)
+                    .foregroundStyle(Theme.muted)
+            }
+        }
+        .padding(.top, 8)
+    }
+
     private var actionErrorShown: Binding<Bool> {
         Binding(get: { model.actionError != nil }, set: { if !$0 { model.actionError = nil } })
     }
@@ -123,36 +174,55 @@ struct OverviewView: View {
 private struct NetWorthContent: View {
     let sheet: BalanceSheet
 
+    private var assets: Double { max(MoneyFormat.double(sheet.assets.amount), 0) }
+    private var debts: Double { max(MoneyFormat.double(sheet.liabilities.amount), 0) }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(sheet.netWorth.formatted)
-                .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                .minimumScaleFactor(0.6)
-                .lineLimit(1)
-            HStack {
-                Figure(label: "Assets", value: sheet.assets.formatted)
-                Spacer()
-                Figure(label: "Debts", value: sheet.liabilities.formatted)
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Net worth")
+                    .font(Theme.small)
+                    .foregroundStyle(Theme.muted)
+                MoneyText(amount: sheet.netWorth.formatted, font: Theme.font(36, .semibold, relativeTo: .largeTitle))
+            }
+            if assets + debts > 0 {
+                // What you own against what you owe, as shares of one bar.
+                GeometryReader { geometry in
+                    let width = geometry.size.width - 2
+                    HStack(spacing: 2) {
+                        Capsule().fill(Theme.accent)
+                            .frame(width: max(width * assets / (assets + debts), 4))
+                        Capsule().fill(Theme.track)
+                    }
+                }
+                .frame(height: 8)
+                .accessibilityHidden(true)
+            }
+            VStack(spacing: 10) {
+                LegendRow(color: Theme.accent, label: "Assets", value: sheet.assets.formatted)
+                LegendRow(color: Theme.track, label: "Debts", value: sheet.liabilities.formatted)
             }
         }
     }
 }
 
-private struct Figure: View {
+/// A row that names one part of a chart and carries its value.
+private struct LegendRow: View {
+    let color: Color
     let label: String
     let value: String
-    var tint: Color = .primary
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: 8) {
+            Circle().fill(color).frame(width: 8, height: 8)
             Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(Theme.body)
+                .foregroundStyle(Theme.muted)
+            Spacer()
             Text(value)
-                .font(.callout.weight(.semibold))
-                .foregroundStyle(tint)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .font(Theme.bodyStrong)
+                .monospacedDigit()
+                .foregroundStyle(Theme.text)
         }
         .accessibilityElement(children: .combine)
     }
@@ -168,51 +238,137 @@ private struct CashFlowContent: View {
         var id: String { "\(series)-\(day)" }
     }
 
+    private static let thisMonth = "This month"
+    private static let lastMonth = "Last month"
+
     /// Running spend by day of the period, for this period and the last one.
     private var points: [Point] {
         guard let comparison = flow.spendingComparison else { return [] }
-        let current = (comparison.current ?? []).enumerated().map {
-            Point(series: "This month", day: $0.offset + 1, amount: MoneyFormat.double($0.element.amount))
-        }
         let previous = (comparison.previous ?? []).enumerated().map {
-            Point(series: "Last month", day: $0.offset + 1, amount: MoneyFormat.double($0.element.amount))
+            Point(series: Self.lastMonth, day: $0.offset + 1, amount: MoneyFormat.double($0.element.amount))
+        }
+        let current = (comparison.current ?? []).enumerated().map {
+            Point(series: Self.thisMonth, day: $0.offset + 1, amount: MoneyFormat.double($0.element.amount))
         }
         return previous + current
     }
 
-    private var netIsPositive: Bool {
-        MoneyFormat.double(flow.netSavings) >= 0
+    /// The first of the month, then every tenth day that the chart reaches.
+    private var dayMarks: [Int] {
+        let last = points.map(\.day).max() ?? 1
+        return [1, 10, 20, 30].filter { $0 <= last }
+    }
+
+    private var net: Double { MoneyFormat.double(flow.netSavings) }
+
+    /// "$28,433.99 more than by 20 Oct", naming what it is measured against.
+    private var comparisonLine: (text: String, color: Color)? {
+        guard let comparison = flow.spendingComparison,
+              let deltaText = comparison.delta, let delta = Decimal(string: deltaText),
+              let endDate = comparison.comparisonEndDate, let date = Day.date(endDate) else { return nil }
+        let day = date.formatted(.dateTime.day().month(.abbreviated))
+        if delta == 0 { return ("The same as by \(day)", Theme.muted) }
+        let amount = MoneyFormat.string(abs(delta), currency: flow.currency)
+        // More spending is the bad direction, so it takes the warning colour.
+        return delta > 0
+            ? ("\(amount) more than by \(day)", Theme.negative)
+            : ("\(amount) less than by \(day)", Theme.positive)
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Figure(label: "Income", value: MoneyFormat.string(flow.income, currency: flow.currency))
-                Spacer()
-                Figure(label: "Spending", value: MoneyFormat.string(flow.spending, currency: flow.currency))
-                Spacer()
-                Figure(
-                    label: netIsPositive ? "Saved" : "Overspent",
-                    value: MoneyFormat.string(flow.netSavings, currency: flow.currency),
-                    tint: netIsPositive ? .green : .red
-                )
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Total spent this month")
+                    .font(Theme.small)
+                    .foregroundStyle(Theme.muted)
+                MoneyText(amount: MoneyFormat.string(flow.spending, currency: flow.currency))
+                if let comparisonLine {
+                    Text(comparisonLine.text)
+                        .font(Theme.small)
+                        .foregroundStyle(comparisonLine.color)
+                }
             }
             if points.count > 1 {
+                HStack(spacing: 16) {
+                    ChartKey(color: Theme.accent, label: Self.thisMonth)
+                    ChartKey(color: Theme.track, label: Self.lastMonth)
+                }
                 Chart(points) { point in
                     LineMark(
                         x: .value("Day", point.day),
                         y: .value("Spent", point.amount)
                     )
                     .foregroundStyle(by: .value("Period", point.series))
-                    .interpolationMethod(.monotone)
+                    .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                 }
                 .chartForegroundStyleScale([
-                    "This month": Color.accentColor,
-                    "Last month": Color.secondary.opacity(0.5),
+                    Self.thisMonth: Theme.accent,
+                    Self.lastMonth: Theme.track,
                 ])
-                .chartXAxisLabel("Day of month")
-                .frame(height: 160)
-                .accessibilityLabel("Spending so far this month compared with last month")
+                .chartLegend(.hidden)
+                .chartXScale(domain: 1...max(points.map(\.day).max() ?? 1, 2))
+                .quietAxes(days: dayMarks)
+                .frame(height: 170)
+                .accessibilityLabel("Running spending this month compared with last month")
+            }
+            VStack(spacing: 10) {
+                RowRule()
+                FigureRow(
+                    label: "Income",
+                    value: "+" + MoneyFormat.string(flow.income, currency: flow.currency),
+                    valueColor: Theme.positive
+                )
+                FigureRow(
+                    label: net >= 0 ? "Left over" : "Overspent by",
+                    value: MoneyFormat.string(Decimal(abs(net)), currency: flow.currency),
+                    valueColor: net >= 0 ? Theme.text : Theme.negative
+                )
+            }
+        }
+    }
+}
+
+/// A dot and a name for one series of a chart.
+struct ChartKey: View {
+    let color: Color
+    let label: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle().fill(color).frame(width: 8, height: 8)
+            Text(label)
+                .font(Theme.small)
+                .foregroundStyle(Theme.muted)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+extension View {
+    /// The app's chart style for a chart over the days of a month: a few faint
+    /// horizontal lines, grey labels, no axis lines and no vertical grid.
+    func quietAxes(days: [Int]) -> some View {
+        chartYAxis {
+            AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 1)).foregroundStyle(Theme.grid)
+                AxisValueLabel {
+                    if let amount = value.as(Double.self) {
+                        Text(amount, format: .number.notation(.compactName))
+                            .font(Theme.font(12, relativeTo: .caption))
+                            .foregroundStyle(Theme.muted)
+                    }
+                }
+            }
+        }
+        .chartXAxis {
+            AxisMarks(values: days) { value in
+                AxisValueLabel {
+                    if let day = value.as(Int.self) {
+                        Text("\(day)")
+                            .font(Theme.font(12, relativeTo: .caption))
+                            .foregroundStyle(Theme.muted)
+                    }
+                }
             }
         }
     }
@@ -220,84 +376,142 @@ private struct CashFlowContent: View {
 
 private struct SpendingContent: View {
     let spending: SpendingVsNormal
+    @State private var showingAll = false
 
-    private var topCategories: [SpendingVsNormal.Category] {
-        spending.categories
-            .sorted { MoneyFormat.double($0.total) > MoneyFormat.double($1.total) }
-            .prefix(6)
-            .map { $0 }
+    private var ranked: [SpendingVsNormal.Category] {
+        spending.categories.sorted { MoneyFormat.double($0.total) > MoneyFormat.double($1.total) }
+    }
+
+    private var shown: [SpendingVsNormal.Category] {
+        showingAll ? ranked : Array(ranked.prefix(5))
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Figure(label: "So far", value: MoneyFormat.string(spending.total, currency: spending.currency))
-                Spacer()
-                if spending.comparable != false, spending.normalTotal != nil {
-                    Figure(
-                        label: "Normal by now",
-                        value: MoneyFormat.string(spending.normalTotal, currency: spending.currency)
+        VStack(alignment: .leading, spacing: 18) {
+            if ranked.isEmpty {
+                EmptyNote(text: "No spending yet this month.")
+            } else {
+                VStack(spacing: 10) {
+                    FigureRow(
+                        label: "Net spending so far",
+                        value: MoneyFormat.string(spending.total, currency: spending.currency)
                     )
-                }
-            }
-            if topCategories.isEmpty {
-                Text("No spending yet this month.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            ForEach(topCategories) { category in
-                HStack(spacing: 8) {
-                    CategoryDot(hex: category.color)
-                    Text(category.name)
-                        .lineLimit(1)
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text(MoneyFormat.string(category.total, currency: spending.currency))
-                            .fontWeight(.medium)
-                        if category.normal != nil {
-                            Text("normal \(MoneyFormat.string(category.normal, currency: spending.currency))")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+                    if spending.comparable != false, spending.normalTotal != nil {
+                        FigureRow(
+                            label: "Normal by now",
+                            value: MoneyFormat.string(spending.normalTotal, currency: spending.currency)
+                        )
                     }
+                    Text("Net spending takes refunds and other money back off, so it can be lower than the total spent.")
+                        .font(Theme.small)
+                        .foregroundStyle(Theme.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    RowRule()
                 }
-                .font(.subheadline)
-                .accessibilityElement(children: .combine)
+                HStack(spacing: 16) {
+                    ChartKey(color: Theme.accent, label: "Within normal")
+                    ChartKey(color: Theme.negative, label: "Above normal")
+                }
+            }
+            ForEach(shown) { category in
+                CategoryPaceRow(
+                    name: category.name,
+                    tint: Tint(hex: category.color),
+                    amount: MoneyFormat.string(category.total, currency: spending.currency),
+                    caption: category.normal.map { "Normal by now \(MoneyFormat.string($0, currency: spending.currency))" },
+                    value: MoneyFormat.double(category.total),
+                    reference: category.normal.map { MoneyFormat.double($0) }
+                )
+            }
+            if ranked.count > 5 {
+                Button(showingAll ? "Show fewer" : "Show all \(ranked.count) categories") {
+                    withAnimation(.snappy) { showingAll.toggle() }
+                }
+                .font(Theme.smallStrong)
+                .foregroundStyle(Theme.text)
             }
         }
+    }
+}
+
+/// One category: its tile and name, what was spent, and a bar against a
+/// budget or a normal amount.
+struct CategoryPaceRow: View {
+    let name: String
+    let tint: Tint
+    let amount: String
+    let caption: String?
+    let value: Double
+    let reference: Double?
+    var scale: Double = 0
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            LetterTile(name: name, tint: tint)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(name)
+                        .font(Theme.body)
+                        .foregroundStyle(Theme.text)
+                        .lineLimit(1)
+                    Spacer()
+                    Text(amount)
+                        .font(Theme.bodyStrong)
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.text)
+                }
+                PaceBar(value: value, reference: reference, scale: scale)
+                if let caption {
+                    Text(caption)
+                        .font(Theme.small)
+                        .foregroundStyle(Theme.muted)
+                }
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
 private struct InsightsContent: View {
     let insights: [Insight]
     let dismiss: (Insight) -> Void
+    @State private var showingAll = false
+
+    private var shown: [Insight] {
+        showingAll ? insights : Array(insights.prefix(3))
+    }
 
     var body: some View {
         if insights.isEmpty {
-            Text("Nothing to flag right now.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            EmptyNote(text: "Nothing to flag right now.")
         } else {
-            VStack(alignment: .leading, spacing: 14) {
-                ForEach(insights) { insight in
-                    HStack(alignment: .top, spacing: 8) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(insight.title)
-                                .font(.subheadline.weight(.semibold))
-                            if let body = insight.body {
-                                Text(body)
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                            }
+            VStack(alignment: .leading, spacing: 16) {
+                ForEach(Array(shown.enumerated()), id: \.element.id) { index, insight in
+                    if index > 0 { RowRule() }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(insight.title)
+                            .font(Theme.bodyStrong)
+                            .foregroundStyle(Theme.text)
+                        if let body = insight.body {
+                            Text(body)
+                                .font(Theme.small)
+                                .foregroundStyle(Theme.muted)
                         }
-                        Spacer(minLength: 0)
-                        Button("Dismiss", systemImage: "xmark") {
+                        Button("Dismiss") {
                             dismiss(insight)
                         }
-                        .labelStyle(.iconOnly)
-                        .buttonStyle(.borderless)
-                        .foregroundStyle(.secondary)
+                        .font(Theme.smallStrong)
+                        .foregroundStyle(Theme.text)
+                        .padding(.top, 2)
                     }
+                }
+                if insights.count > 3 {
+                    RowRule()
+                    Button(showingAll ? "Show fewer" : "Show all \(insights.count) insights") {
+                        withAnimation(.snappy) { showingAll.toggle() }
+                    }
+                    .font(Theme.smallStrong)
+                    .foregroundStyle(Theme.text)
                 }
             }
         }

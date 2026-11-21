@@ -4,6 +4,10 @@ import SwiftUI
 struct SurelyNotApp: App {
     @State private var session = Session()
 
+    init() {
+        Theme.applyBarAppearance()
+    }
+
     var body: some Scene {
         WindowGroup {
             Group {
@@ -16,6 +20,9 @@ struct SurelyNotApp: App {
                 }
             }
             .environment(session)
+            .font(Theme.body)
+            // Controls stay neutral. Colour is kept for the data.
+            .tint(Theme.text)
         }
     }
 }
@@ -47,22 +54,35 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Server") {
-                    Text(session.serverURL?.absoluteString ?? "Not signed in")
-                        .foregroundStyle(.secondary)
-                }
-                Section {
-                    Button("Sign out", role: .destructive) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.gap) {
+                    Card {
+                        HStack(spacing: 12) {
+                            ProductMark(size: 32)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Surely Not")
+                                    .font(Theme.bodyStrong)
+                                    .foregroundStyle(Theme.text)
+                                Text("Version \(appVersion)")
+                                    .font(Theme.small)
+                                    .foregroundStyle(Theme.muted)
+                            }
+                        }
+                        RowRule()
+                        FigureRow(label: "Server", value: session.serverURL?.host() ?? "Not signed in")
+                    }
+                    Button("Sign out") {
                         session.signOut()
                     }
-                }
-                Section {
-                    LabeledContent("Version", value: appVersion)
-                } footer: {
+                    .buttonStyle(PrimaryButtonStyle(fullWidth: true))
                     Text("Surely Not is an unofficial, open source app. It is not affiliated with the Sure project.")
+                        .font(Theme.small)
+                        .foregroundStyle(Theme.muted)
+                        .padding(.horizontal, 4)
                 }
+                .padding(Theme.margin)
             }
+            .screenBackground()
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

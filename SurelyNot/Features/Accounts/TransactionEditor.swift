@@ -107,6 +107,8 @@ struct TransactionEditor: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .screenBackground()
             .navigationTitle(existing == nil ? "New transaction" : "Edit transaction")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

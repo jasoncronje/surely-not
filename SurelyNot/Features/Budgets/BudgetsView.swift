@@ -122,25 +122,27 @@ struct BudgetsView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                LoadableView(state: model.budgets, retry: model.load) { budgets in
-                    if let budget = model.selected {
-                        VStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: Theme.gap) {
+                    ScreenHeader(title: "Budgets")
+                        .padding(.top, 8)
+                    LoadableView(state: model.budgets, retry: model.load) { budgets in
+                        if let budget = model.selected {
                             monthSwitcher(budget)
-                            LoadableView(state: model.detail, retry: model.loadDetail) { detail in
+                            LoadableView(state: model.detail, placeholderLines: 6, retry: model.loadDetail) { detail in
                                 BudgetContent(budget: budget, detail: detail)
                             }
+                        } else if budgets.isEmpty {
+                            Card {
+                                EmptyNote(text: "No budgets yet. Create one in Sure on the web. This app can show budgets but not change them.")
+                            }
                         }
-                    } else if budgets.isEmpty {
-                        ContentUnavailableView(
-                            "No budgets",
-                            systemImage: "target",
-                            description: Text("Create a budget in Sure on the web. This app can show budgets but not change them.")
-                        )
                     }
                 }
-                .padding(16)
+                .padding(.horizontal, Theme.margin)
+                .padding(.bottom, 24)
             }
-            .navigationTitle("Budgets")
+            .screenBackground()
+            .toolbar(.hidden, for: .navigationBar)
             .refreshable { await model.load() }
             .task { await model.load() }
         }
@@ -154,15 +156,15 @@ struct BudgetsView: View {
             .disabled(!model.canStep(-1))
             Spacer()
             Text(budget.name)
-                .font(.headline)
+                .font(Theme.section)
+                .foregroundStyle(Theme.text)
             Spacer()
             Button("Later month", systemImage: "chevron.right") {
                 Task { await model.step(1) }
             }
             .disabled(!model.canStep(1))
         }
-        .labelStyle(.iconOnly)
-        .buttonStyle(.bordered)
+        .buttonStyle(IconButtonStyle())
     }
 }
 
@@ -174,82 +176,81 @@ private struct BudgetContent: View {
         MoneyFormat.decimal(cents: budget.budgetedSpendingCents ?? 0, currency: budget.currency)
     }
 
+    private func double(_ value: Decimal) -> Double {
+        NSDecimalNumber(decimal: value).doubleValue
+    }
+
+    /// "$120.00 left" or "$80.00 over", against the whole month's budget.
+    private var remainder: (text: String, color: Color)? {
+        guard totalBudgeted > 0, let spent = detail.totalSpent else { return nil }
+        let left = totalBudgeted - spent
+        let amount = MoneyFormat.string(abs(left), currency: budget.currency)
+        return left >= 0 ? ("\(amount) left of \(MoneyFormat.string(totalBudgeted, currency: budget.currency))", Theme.muted)
+            : ("\(amount) over the \(MoneyFormat.string(totalBudgeted, currency: budget.currency)) budget", Theme.negative)
+    }
+
+    /// The largest category, so unbudgeted bars can be compared with each other.
+    private var largestSpend: Double {
+        detail.lines.compactMap(\.spent).map(double).max() ?? 0
+    }
+
     var body: some View {
-        VStack(spacing: 16) {
-            if budget.initialized == false {
-                Label(
-                    "This month's budget has not been set up. Set it up in Sure on the web; this app can show budgets but not change them.",
-                    systemImage: "info.circle"
-                )
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            if let note = detail.spendingNote {
-                Label(note, systemImage: "exclamationmark.triangle")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            Card(title: "Total") {
-                BudgetBar(spent: detail.totalSpent, budgeted: totalBudgeted, currency: budget.currency)
+        VStack(alignment: .leading, spacing: Theme.gap) {
+            Card {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Net spent")
+                        .font(Theme.small)
+                        .foregroundStyle(Theme.muted)
+                    if let spent = detail.totalSpent {
+                        MoneyText(amount: MoneyFormat.string(spent, currency: budget.currency))
+                    } else {
+                        Text("–")
+                            .font(Theme.section)
+                            .foregroundStyle(Theme.muted)
+                    }
+                    if let remainder {
+                        Text(remainder.text)
+                            .font(Theme.small)
+                            .foregroundStyle(remainder.color)
+                    }
+                }
+                if totalBudgeted > 0, let spent = detail.totalSpent {
+                    PaceBar(value: double(spent), reference: double(totalBudgeted))
+                }
+                if budget.initialized == false || totalBudgeted == 0 {
+                    Text("No budget is set for this month, so there is nothing to measure against. Set one up in Sure on the web; this app can show budgets but not change them.")
+                        .font(Theme.small)
+                        .foregroundStyle(Theme.muted)
+                }
+                Text("Net of refunds and other money back.")
+                    .font(Theme.small)
+                    .foregroundStyle(Theme.muted)
+                if let note = detail.spendingNote {
+                    Text(note)
+                        .font(Theme.small)
+                        .foregroundStyle(Theme.muted)
+                }
             }
             Card(title: "By category") {
                 if detail.lines.isEmpty {
-                    Text("No categories in this budget.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    EmptyNote(text: "No categories in this budget.")
                 }
-                ForEach(detail.lines) { line in
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 8) {
-                            CategoryDot(hex: line.color)
-                            Text(line.name)
-                                .font(.subheadline.weight(.medium))
-                        }
-                        BudgetBar(spent: line.spent, budgeted: line.budgeted, currency: budget.currency)
+                VStack(spacing: 18) {
+                    ForEach(detail.lines) { line in
+                        CategoryPaceRow(
+                            name: line.name,
+                            tint: Tint(hex: line.color),
+                            amount: line.spent.map { MoneyFormat.string($0, currency: budget.currency) } ?? "–",
+                            caption: line.budgeted > 0
+                                ? "Budget \(MoneyFormat.string(line.budgeted, currency: budget.currency))"
+                                : nil,
+                            value: double(line.spent ?? 0),
+                            reference: line.budgeted > 0 ? double(line.budgeted) : nil,
+                            scale: largestSpend
+                        )
                     }
                 }
             }
         }
-    }
-}
-
-/// "Spent X of Y" with a bar that turns red when over budget.
-private struct BudgetBar: View {
-    let spent: Decimal?
-    let budgeted: Decimal
-    let currency: String
-
-    private var isOver: Bool {
-        guard let spent, budgeted > 0 else { return false }
-        return spent > budgeted
-    }
-
-    private var summary: String {
-        let spentText = spent.map { MoneyFormat.string($0, currency: currency) } ?? "–"
-        guard budgeted > 0 else { return "\(spentText) spent, no budget set" }
-        return "\(spentText) of \(MoneyFormat.string(budgeted, currency: currency))"
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            if budgeted > 0, let spent {
-                let fraction = min(max(NSDecimalNumber(decimal: spent / budgeted).doubleValue, 0), 1)
-                ProgressView(value: fraction)
-                    .tint(isOver ? .red : .accentColor)
-            }
-            HStack {
-                Text(summary)
-                Spacer()
-                if isOver, let spent {
-                    Text("\(MoneyFormat.string(spent - budgeted, currency: currency)) over")
-                        .foregroundStyle(.red)
-                }
-            }
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-        }
-        .accessibilityElement(children: .combine)
     }
 }

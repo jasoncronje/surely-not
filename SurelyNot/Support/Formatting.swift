@@ -43,9 +43,16 @@ nonisolated enum Day {
         date.formatted(style)
     }
 
-    /// "20 Nov 2026" style, or the raw text if it is not a date.
-    static func display(_ string: String) -> String {
+    /// "Today", "Yesterday", "Thu 20 Nov", or with the year for other years.
+    /// Text that is not a date comes back unchanged.
+    static func display(_ string: String, now: Date = .now, calendar: Calendar = .current) -> String {
         guard let date = date(string) else { return string }
+        if calendar.isDate(date, inSameDayAs: now) { return "Today" }
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: now),
+           calendar.isDate(date, inSameDayAs: yesterday) { return "Yesterday" }
+        if calendar.isDate(date, equalTo: now, toGranularity: .year) {
+            return date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
+        }
         return date.formatted(date: .abbreviated, time: .omitted)
     }
 }
