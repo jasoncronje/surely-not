@@ -12,4 +12,6 @@ This project is not affiliated with, endorsed by, or sponsored by the Sure proje
 
 ## Licence
 
-Licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0), the same licence Sure uses.
+Licensed under the [MIT License](LICENSE).
+
+Sure itself is licensed under AGPL-3.0. This client contains no Sure code or assets; it only talks to a Sure server through its API.
