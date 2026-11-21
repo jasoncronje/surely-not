@@ -1,0 +1,47 @@
+name: SurelyNot
+options:
+  bundleIdPrefix: io.cronje
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    SWIFT_APPROACHABLE_CONCURRENCY: YES
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  SurelyNot:
+    type: application
+    platform: iOS
+    sources: [SurelyNot]
+    info:
+      path: SurelyNot/Info.plist
+      properties:
+        CFBundleDisplayName: Surely Not
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        ITSAppUsesNonExemptEncryption: false
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.cronje.surelynot
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        TARGETED_DEVICE_FAMILY: "1"
+    scheme:
+      testTargets: [SurelyNotTests]
+  SurelyNotTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [SurelyNotTests]
+    dependencies:
+      - target: SurelyNot
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: io.cronje.surelynot.tests

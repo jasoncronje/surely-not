@@ -1,0 +1,351 @@
+import Foundation
+
+// Models mirror the JSON returned by the Sure REST API (/api/v1).
+// Fields that are not essential are optional so the app keeps working
+// against Sure servers that are older or newer than the one it was built on.
+
+nonisolated struct Pagination: Decodable, Sendable {
+    let page: Int
+    let perPage: Int
+    let totalCount: Int
+    let totalPages: Int
+}
+
+/// A paginated list. Sure wraps every list in an object whose single
+/// non-pagination key names the resource, e.g. `{ "accounts": [...], "pagination": {...} }`.
+nonisolated struct Page<Item: Decodable & Sendable>: Decodable, Sendable {
+    let items: [Item]
+    let pagination: Pagination?
+
+    var hasMore: Bool {
+        guard let pagination else { return false }
+        return pagination.page < pagination.totalPages
+    }
+
+    private struct AnyKey: CodingKey {
+        var stringValue: String
+        var intValue: Int? { nil }
+        init?(stringValue: String) { self.stringValue = stringValue }
+        init?(intValue: Int) { nil }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: AnyKey.self)
+        let listKeys = container.allKeys.filter { $0.stringValue != "pagination" }
+        guard listKeys.count == 1, let listKey = listKeys.first else {
+            throw DecodingError.dataCorrupted(.init(
+                codingPath: decoder.codingPath,
+                debugDescription: "Expected one list key, found \(listKeys.map(\.stringValue))"
+            ))
+        }
+        items = try container.decode([Item].self, forKey: listKey)
+        if let paginationKey = container.allKeys.first(where: { $0.stringValue == "pagination" }) {
+            pagination = try container.decodeIfPresent(Pagination.self, forKey: paginationKey)
+        } else {
+            pagination = nil
+        }
+    }
+}
+
+/// Absorbs a JSON value of any shape, for fields whose type is not stable.
+nonisolated enum JSONValue: Decodable, Sendable {
+    case string(String)
+    case other
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let string = try? container.decode(String.self) {
+            self = .string(string)
+        } else {
+            self = .other
+        }
+    }
+
+    var text: String? {
+        if case .string(let value) = self { return value }
+        return nil
+    }
+}
+
+// MARK: - Accounts
+
+nonisolated struct Account: Decodable, Sendable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let balance: String
+    let balanceCents: Int?
+    let currency: String
+    let classification: String?
+    let accountType: String?
+    let subtype: String?
+    let status: String?
+    let institutionName: String?
+
+    var isLiability: Bool { classification == "liability" }
+    var holdsSecurities: Bool { accountType == "investment" || accountType == "crypto" }
+}
+
+nonisolated struct AccountRef: Decodable, Sendable, Hashable {
+    let id: String
+    let name: String
+    let accountType: String?
+}
+
+nonisolated struct BalancePoint: Decodable, Sendable, Identifiable {
+    let id: String
+    let date: String
+    let currency: String?
+    let balanceCents: Int?
+    let endBalanceCents: Int?
+
+    var cents: Int? { endBalanceCents ?? balanceCents }
+}
+
+nonisolated struct Holding: Decodable, Sendable, Identifiable {
+    nonisolated struct Security: Decodable, Sendable {
+        let id: String?
+        let ticker: String?
+        let name: String?
+    }
+
+    let id: String
+    let date: String
+    let qty: String?
+    let price: String?
+    let amount: String?
+    let security: Security?
+}
+
+// MARK: - Transactions
+
+nonisolated struct CategoryRef: Decodable, Sendable, Hashable, Identifiable {
+    let id: String
+    let name: String
+    let color: String?
+}
+
+nonisolated struct MerchantRef: Decodable, Sendable, Hashable {
+    let id: String
+    let name: String
+}
+
+nonisolated struct Transaction: Decodable, Sendable, Identifiable, Hashable {
+    let id: String
+    let date: String
+    let amount: String
+    let amountCents: Int?
+    let signedAmountCents: Int?
+    let currency: String
+    let name: String
+    let notes: String?
+    let classification: String?
+    let account: AccountRef?
+    let category: CategoryRef?
+    let merchant: MerchantRef?
+
+    var isIncome: Bool { classification == "income" }
+}
+
+/// Body for creating or updating a transaction. Nil fields are left out.
+nonisolated struct TransactionInput: Encodable, Sendable {
+    var accountId: String?
+    var date: String
+    var amount: Decimal
+    var name: String
+    var notes: String?
+    var categoryId: String?
+    var nature: String
+}
+
+nonisolated struct TransactionEnvelope: Encodable, Sendable {
+    let transaction: TransactionInput
+}
+
+// MARK: - Overview
+
+nonisolated struct Money: Decodable, Sendable {
+    let amount: String
+    let currency: String
+    let formatted: String
+}
+
+nonisolated struct BalanceSheet: Decodable, Sendable {
+    let currency: String
+    let netWorth: Money
+    let assets: Money
+    let liabilities: Money
+}
+
+nonisolated struct DateRange: Decodable, Sendable {
+    let startDate: String
+    let endDate: String
+}
+
+nonisolated struct CashFlow: Decodable, Sendable {
+    nonisolated struct DayAmount: Decodable, Sendable {
+        let date: String
+        let amount: String
+    }
+
+    /// Running spending totals per day, for this period and the one before it.
+    nonisolated struct SpendingComparison: Decodable, Sendable {
+        let currentTotal: String?
+        let comparisonTotal: String?
+        let delta: String?
+        let current: [DayAmount]?
+        let previous: [DayAmount]?
+    }
+
+    let currency: String
+    let period: DateRange?
+    let income: String
+    let spending: String
+    let netSavings: String
+    let savingsRate: String?
+    let spendingComparison: SpendingComparison?
+}
+
+nonisolated struct SpendingVsNormal: Decodable, Sendable {
+    nonisolated struct Category: Decodable, Sendable, Identifiable {
+        let categoryId: String?
+        let name: String
+        let color: String?
+        let total: String
+        let normal: String?
+
+        var id: String { categoryId ?? name }
+
+        private enum CodingKeys: String, CodingKey {
+            case categoryId = "id", name, color, total, normal
+        }
+    }
+
+    let currency: String
+    let period: DateRange?
+    let comparable: Bool?
+    let total: String
+    let normalTotal: String?
+    let categories: [Category]
+}
+
+nonisolated struct Insight: Decodable, Sendable, Identifiable {
+    let id: String
+    let title: String
+    let body: String?
+    let priority: String?
+    let status: String?
+}
+
+nonisolated struct InsightList: Decodable, Sendable {
+    let insights: [Insight]
+}
+
+// MARK: - Budgets
+
+nonisolated struct Budget: Decodable, Sendable, Identifiable, Hashable {
+    let id: String
+    let startDate: String
+    let endDate: String
+    let name: String
+    let currency: String
+    let initialized: Bool?
+    let current: Bool?
+    let budgetedSpending: String?
+    let budgetedSpendingCents: Int?
+    let expectedIncome: String?
+}
+
+nonisolated struct BudgetCategory: Decodable, Sendable, Identifiable {
+    nonisolated struct Category: Decodable, Sendable {
+        let id: String
+        let name: String
+        let color: String?
+        let parentId: String?
+    }
+
+    let id: String
+    let budgetId: String?
+    let currency: String?
+    let subcategory: Bool?
+    let budgetedSpending: String?
+    let budgetedSpendingCents: Int?
+    let category: Category
+}
+
+// MARK: - Chat
+
+nonisolated struct ChatMessage: Decodable, Sendable, Identifiable {
+    let id: String
+    let role: String?
+    let content: String?
+    let createdAt: Date?
+    /// Only present on the response to sending a message.
+    let aiResponseStatus: String?
+
+    var isUser: Bool { role == "user" }
+}
+
+nonisolated struct Chat: Decodable, Sendable, Identifiable {
+    let id: String
+    let title: String
+    let lastMessageAt: Date?
+    let messageCount: Int?
+    let error: JSONValue?
+    let messages: [ChatMessage]?
+    /// Paging for `messages`, present when one chat is fetched.
+    let pagination: Pagination?
+
+    var hasError: Bool { error != nil }
+
+    /// True when the server returned only part of a long chat.
+    var isTruncated: Bool {
+        guard let pagination, let messages else { return false }
+        return pagination.totalCount > messages.count
+    }
+}
+
+nonisolated struct NewChatInput: Encodable, Sendable {
+    let title: String
+    let message: String
+}
+
+nonisolated struct ChatTitleInput: Encodable, Sendable {
+    let title: String
+}
+
+nonisolated struct NewMessageInput: Encodable, Sendable {
+    let content: String
+}
+
+// MARK: - Auth
+
+nonisolated struct DeviceInfo: Encodable, Sendable {
+    let deviceId: String
+    var deviceName: String?
+    var deviceType: String?
+    var osVersion: String?
+    var appVersion: String?
+}
+
+nonisolated struct LoginInput: Encodable, Sendable {
+    let email: String
+    let password: String
+    let otpCode: String?
+    let device: DeviceInfo
+}
+
+nonisolated struct RefreshInput: Encodable, Sendable {
+    let refreshToken: String
+    let device: DeviceInfo
+}
+
+nonisolated struct TokenResponse: Decodable, Sendable {
+    let accessToken: String
+    let refreshToken: String
+}
+
+nonisolated struct ErrorResponse: Decodable, Sendable {
+    let error: String?
+    let message: String?
+    let errors: [String]?
+}
