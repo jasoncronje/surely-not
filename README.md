@@ -1,6 +1,6 @@
-# Surefin
+# Surely Not
 
-Surefin is an unofficial, community-built native iOS client (Swift / SwiftUI) for self-hosted [Sure](https://github.com/we-promise/sure), the open source personal finance app.
+Surely Not is an unofficial, community-built native iOS client (Swift / SwiftUI) for self-hosted [Sure](https://github.com/we-promise/sure), the open source personal finance app.
 
 ## Status
 
