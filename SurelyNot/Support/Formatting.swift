@@ -11,8 +11,18 @@ nonisolated enum MoneyFormat {
         value.formatted(.currency(code: currency))
     }
 
+    /// Sure reports amounts in the currency's smallest unit and calls them
+    /// "cents". How many of those make one whole unit depends on the currency:
+    /// 100 for dollars, 1 for yen, 1000 for Kuwaiti dinar.
+    static func decimal(cents: Int, currency: String) -> Decimal {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = currency
+        return Decimal(cents) / pow(10, formatter.maximumFractionDigits)
+    }
+
     static func string(cents: Int, currency: String) -> String {
-        string(Decimal(cents) / 100, currency: currency)
+        string(decimal(cents: cents, currency: currency), currency: currency)
     }
 
     static func double(_ amount: String?) -> Double {

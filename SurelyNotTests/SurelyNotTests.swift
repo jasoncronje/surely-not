@@ -144,6 +144,14 @@ private func decode<T: Decodable>(_ type: T.Type, _ json: String) throws -> T {
     }
 }
 
+@Suite struct MoneyFormatTests {
+    @Test func smallestUnitDependsOnCurrency() {
+        #expect(MoneyFormat.decimal(cents: 120050, currency: "USD") == Decimal(string: "1200.5"))
+        #expect(MoneyFormat.decimal(cents: 1200, currency: "JPY") == 1200)
+        #expect(MoneyFormat.decimal(cents: 1500, currency: "KWD") == Decimal(string: "1.5"))
+    }
+}
+
 @Suite struct GroupingTests {
     private func account(_ id: String, type: String, classification: String, cents: Int, currency: String = "USD") -> Account {
         Account(id: id, name: id, balance: "", balanceCents: cents, currency: currency,

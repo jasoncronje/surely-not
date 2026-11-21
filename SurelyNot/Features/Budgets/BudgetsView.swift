@@ -99,7 +99,7 @@ final class BudgetsModel {
                     id: item.id,
                     name: item.category.name,
                     color: item.category.color,
-                    budgeted: Decimal(item.budgetedSpendingCents ?? 0) / 100,
+                    budgeted: MoneyFormat.decimal(cents: item.budgetedSpendingCents ?? 0, currency: item.currency ?? ""),
                     spent: spending == nil ? nil : (spentByCategory[item.category.id] ?? 0)
                 )
             }
@@ -171,7 +171,7 @@ private struct BudgetContent: View {
     let detail: BudgetDetail
 
     private var totalBudgeted: Decimal {
-        Decimal(budget.budgetedSpendingCents ?? 0) / 100
+        MoneyFormat.decimal(cents: budget.budgetedSpendingCents ?? 0, currency: budget.currency)
     }
 
     var body: some View {

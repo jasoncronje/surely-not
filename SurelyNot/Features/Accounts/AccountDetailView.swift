@@ -42,7 +42,8 @@ final class AccountDetailModel {
             try await client.balances(accountID: account.id, since: Day.string(start))
                 .compactMap { point -> BalanceSample? in
                     guard let date = Day.date(point.date), let cents = point.cents, date <= .now else { return nil }
-                    return BalanceSample(date: date, amount: Double(cents) / 100)
+                    let amount = MoneyFormat.decimal(cents: cents, currency: point.currency ?? account.currency)
+                    return BalanceSample(date: date, amount: NSDecimalNumber(decimal: amount).doubleValue)
                 }
                 .sorted { $0.date < $1.date }
         }
@@ -274,6 +275,13 @@ private struct HoldingRow: View {
 struct TransactionRow: View {
     let transaction: Transaction
 
+    /// Sure writes money coming in as a negative amount ("-$442.13"). The row
+    /// shows it as "+$442.13" instead.
+    private var amountText: String {
+        let unsigned = transaction.amount.replacingOccurrences(of: "-", with: "")
+        return transaction.isIncome ? "+\(unsigned)" : unsigned
+    }
+
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
@@ -291,7 +299,7 @@ struct TransactionRow: View {
                 .lineLimit(1)
             }
             Spacer()
-            Text(transaction.isIncome ? "+\(transaction.amount)" : transaction.amount)
+            Text(amountText)
                 .fontWeight(.medium)
                 .monospacedDigit()
                 .foregroundStyle(transaction.isIncome ? .green : .primary)

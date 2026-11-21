@@ -43,7 +43,9 @@ struct TransactionEditor: View {
         self.model = model
         self.existing = existing
         _name = State(initialValue: existing?.name ?? "")
-        let amount = existing?.amountCents.map { Decimal(abs($0)) / 100 }
+        let amount = existing.flatMap { transaction in
+            transaction.amountCents.map { MoneyFormat.decimal(cents: abs($0), currency: transaction.currency) }
+        }
         _amountText = State(initialValue: amount.map { "\($0)" } ?? "")
         _isIncome = State(initialValue: existing?.isIncome ?? false)
         _date = State(initialValue: existing.flatMap { Day.date($0.date) } ?? .now)
