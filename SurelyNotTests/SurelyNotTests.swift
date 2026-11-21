@@ -347,3 +347,30 @@ private func decode<T: Decodable>(_ type: T.Type, _ json: String) throws -> T {
         #expect(summed.debts == MoneyFormat.string(50, currency: "USD"))
     }
 }
+
+@Suite struct TextRevealTests {
+    @Test func revealsEverythingInWholeWordsAndStops() {
+        let text = "You spent **$46.31** on food last month, which is less than usual."
+        var count = 0
+        var steps = 0
+        while count < text.count {
+            let next = TextReveal.nextCount(current: count, text: text)
+            #expect(next > count)
+            // Each step ends at the end of the text or just before a space.
+            if next < text.count {
+                #expect(text[text.index(text.startIndex, offsetBy: next)].isWhitespace)
+            }
+            count = next
+            steps += 1
+        }
+        #expect(count == text.count)
+        #expect(steps > 3)
+        #expect(TextReveal.nextCount(current: count, text: text) == text.count)
+    }
+
+    @Test func speedsUpWhenALotIsWaiting() {
+        let long = String(repeating: "word ", count: 600)
+        #expect(TextReveal.nextCount(current: 0, text: long) >= 100)
+        #expect(TextReveal.nextCount(current: 0, text: "hi there you") <= 8)
+    }
+}

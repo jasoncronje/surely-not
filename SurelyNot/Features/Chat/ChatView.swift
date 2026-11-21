@@ -1,10 +1,38 @@
 import Observation
 import SwiftUI
 
+/// Paces how a reply is typed onto the screen.
+///
+/// Sure's API does not stream. The app fetches the reply in whole chunks, so
+/// without this a long answer would pop in all at once. Each step shows a
+/// little more: slowly when little is waiting, faster when a lot is, so the
+/// screen catches up with the server within a few seconds.
+nonisolated enum TextReveal {
+    /// Steps per second.
+    static let rate = 30.0
+
+    /// How many characters to show after one more step.
+    static func nextCount(current: Int, text: String) -> Int {
+        let total = text.count
+        guard current < total else { return total }
+        let step = max(2, (total - current) / 25)
+        var next = min(current + step, total)
+        // Finish the word in progress, so words and Markdown marks are not
+        // shown half-written.
+        var index = text.index(text.startIndex, offsetBy: next)
+        var extended = 0
+        while index < text.endIndex, !text[index].isWhitespace, extended < 16 {
+            index = text.index(after: index)
+            next += 1
+            extended += 1
+        }
+        return next
+    }
+}
+
 @Observable
 final class ChatModel {
-    /// A message as shown on screen. `pending` ones were typed here and have
-    /// not come back from the server yet.
+    /// A message as shown on screen.
     struct Bubble: Identifiable {
         let id: String
         let isUser: Bool
@@ -22,6 +50,24 @@ final class ChatModel {
     /// A failed send or a failed AI reply. Offers a retry when the server has one.
     var replyError: String?
     var canRetry = false
+
+    /// The reply being typed onto the screen, and how much of it shows so far.
+    private(set) var revealingID: String?
+    private(set) var revealedCount = 0
+    private var revealTask: Task<Void, Never>?
+    /// Messages that were already on screen when the last message was sent.
+    /// Only a reply that is not in here gets typed out.
+    private var idsBeforeSend: Set<String> = []
+
+    /// True until the first words of a reply are on screen.
+    var isThinking: Bool {
+        isWaitingForReply && revealedCount == 0
+    }
+
+    /// The text to draw for a bubble: all of it, or the part typed so far.
+    func visibleText(for bubble: Bubble) -> String {
+        bubble.id == revealingID ? String(bubble.text.prefix(revealedCount)) : bubble.text
+    }
 
     init(client: APIClient, chatID: String?) {
         self.client = client
@@ -46,6 +92,7 @@ final class ChatModel {
         let content = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !content.isEmpty, !isWaitingForReply else { return }
         let countBefore = bubbles.count
+        beginExpectingReply()
         bubbles.append(Bubble(id: "pending-\(UUID().uuidString)", isUser: true, text: content))
         replyError = nil
         isWaitingForReply = true
@@ -68,6 +115,7 @@ final class ChatModel {
     func retry() async {
         guard let chatID, !isWaitingForReply else { return }
         replyError = nil
+        beginExpectingReply()
         isWaitingForReply = true
         defer { isWaitingForReply = false }
         do {
@@ -81,14 +129,15 @@ final class ChatModel {
     }
 
     /// Sure does not stream replies over this API, so the app checks the chat
-    /// every two seconds. The reply is treated as finished once it has text
-    /// that did not change between two checks, because the server fills it in
-    /// gradually. Gives up after two minutes.
+    /// every second. The server may fill a reply in gradually, so it counts as
+    /// finished once its text has stayed the same for two checks in a row.
+    /// Gives up after two minutes.
     private func waitForReply(after messageCount: Int) async throws {
         guard let chatID else { return }
         var lastSeenReply: String?
-        for _ in 0..<60 {
-            try await Task.sleep(for: .seconds(2))
+        var unchangedChecks = 0
+        for _ in 0..<120 {
+            try await Task.sleep(for: .seconds(1))
             let chat = try await client.chat(id: chatID)
             apply(chat)
             if chat.hasError {
@@ -96,14 +145,26 @@ final class ChatModel {
                 replyError = chat.error?.text ?? "The assistant could not answer."
                 return
             }
-            guard bubbles.count > messageCount, let last = bubbles.last, !last.isUser, !last.text.isEmpty else {
+            guard bubbles.count > messageCount, let last = bubbles.last, !last.isUser else {
                 continue
             }
-            if last.text == lastSeenReply { return }
-            lastSeenReply = last.text
+            if last.text == lastSeenReply {
+                unchangedChecks += 1
+                if unchangedChecks >= 2 { return }
+            } else {
+                lastSeenReply = last.text
+                unchangedChecks = 0
+            }
         }
         canRetry = false
         replyError = "The assistant is taking a long time. Pull down to check again."
+    }
+
+    private func beginExpectingReply() {
+        revealTask?.cancel()
+        revealingID = nil
+        revealedCount = 0
+        idsBeforeSend = Set(bubbles.map(\.id))
     }
 
     private func apply(_ chat: Chat) {
@@ -118,6 +179,30 @@ final class ChatModel {
         if chat.hasError, !isWaitingForReply {
             canRetry = true
             replyError = chat.error?.text ?? "The assistant could not answer."
+        }
+        if isWaitingForReply, revealingID == nil,
+           let reply = bubbles.last, !reply.isUser, !idsBeforeSend.contains(reply.id) {
+            startRevealing(reply.id)
+        }
+    }
+
+    /// Types the reply out a little at a time. Keeps going while the server
+    /// may still add text, and stops once everything received is on screen.
+    private func startRevealing(_ id: String) {
+        revealingID = id
+        revealedCount = 0
+        revealTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1 / TextReveal.rate))
+                guard let self, !Task.isCancelled, self.revealingID == id,
+                      let text = self.bubbles.first(where: { $0.id == id })?.text else { return }
+                if self.revealedCount < text.count {
+                    self.revealedCount = TextReveal.nextCount(current: self.revealedCount, text: text)
+                } else if !self.isWaitingForReply {
+                    self.revealingID = nil
+                    return
+                }
+            }
         }
     }
 }
@@ -166,9 +251,12 @@ struct ChatView: View {
                         .foregroundStyle(Theme.muted)
                 }
                 ForEach(model.bubbles) { bubble in
-                    BubbleView(bubble: bubble)
+                    let text = model.visibleText(for: bubble)
+                    if !text.isEmpty {
+                        BubbleView(isUser: bubble.isUser, text: text)
+                    }
                 }
-                if model.isWaitingForReply {
+                if model.isThinking {
                     HStack(spacing: 8) {
                         ProgressView()
                         Text("Thinking")
@@ -278,13 +366,14 @@ struct ChatView: View {
 }
 
 private struct BubbleView: View {
-    let bubble: ChatModel.Bubble
+    let isUser: Bool
+    let text: String
 
     var body: some View {
-        if bubble.isUser {
+        if isUser {
             HStack {
                 Spacer(minLength: 48)
-                Text(bubble.text)
+                Text(text)
                     .font(Theme.body)
                     .foregroundStyle(Theme.onPrimary)
                     .textSelection(.enabled)
@@ -293,15 +382,15 @@ private struct BubbleView: View {
                     .background(Theme.primary, in: .rect(cornerRadius: Theme.cardRadius))
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("You: \(bubble.text)")
+            .accessibilityLabel("You: \(text)")
         } else {
             // Replies take the full width, so their tables have room.
-            MarkdownView(bubble.text)
+            MarkdownView(text)
                 .textSelection(.enabled)
                 .padding(Theme.cardPadding)
                 .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("Assistant: \(bubble.text)")
+                .accessibilityLabel("Assistant: \(text)")
         }
     }
 }
