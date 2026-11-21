@@ -257,13 +257,7 @@ struct ChatView: View {
                     }
                 }
                 if model.isThinking {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                        Text("Thinking")
-                            .font(Theme.small)
-                            .foregroundStyle(Theme.muted)
-                    }
-                    .padding(.horizontal, 4)
+                    ThinkingIndicator()
                 }
                 if let error = model.replyError {
                     VStack(alignment: .leading, spacing: 8) {
@@ -392,5 +386,81 @@ private struct BubbleView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Assistant: \(text)")
         }
+    }
+}
+
+/// Shown while a reply is on its way: the app's mark drawing itself over and
+/// over, in the place the reply will appear. First the tick, then the stroke
+/// through it, then it fades and starts again.
+private struct ThinkingIndicator: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// Seconds for one full loop.
+    private static let loop = 1.9
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if reduceMotion {
+                ProductMark(size: 22)
+            } else {
+                TimelineView(.animation) { timeline in
+                    let time = timeline.date.timeIntervalSinceReferenceDate
+                        .truncatingRemainder(dividingBy: Self.loop)
+                    DrawnMark(
+                        tick: Self.eased((time - 0.05) / 0.5),
+                        strike: Self.eased((time - 0.6) / 0.3),
+                        opacity: 1 - Self.eased((time - 1.45) / 0.4)
+                    )
+                }
+                .frame(width: 22, height: 22)
+            }
+            Text("Thinking")
+                .font(Theme.small)
+                .foregroundStyle(Theme.muted)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("The assistant is thinking")
+    }
+
+    /// Clamps to 0...1 and eases in and out.
+    private static func eased(_ value: Double) -> Double {
+        let t = min(max(value, 0), 1)
+        return t * t * (3 - 2 * t)
+    }
+}
+
+/// The app's mark with each stroke drawn part of the way.
+private struct DrawnMark: View {
+    let tick: Double
+    let strike: Double
+    let opacity: Double
+
+    var body: some View {
+        Canvas { context, canvas in
+            let unit = canvas.width / 24
+            var tickPath = Path()
+            tickPath.move(to: CGPoint(x: 3.5 * unit, y: 12.5 * unit))
+            tickPath.addLine(to: CGPoint(x: 9.5 * unit, y: 18.5 * unit))
+            tickPath.addLine(to: CGPoint(x: 20.5 * unit, y: 5.5 * unit))
+            var strikePath = Path()
+            strikePath.move(to: CGPoint(x: 11.5 * unit, y: 5 * unit))
+            strikePath.addLine(to: CGPoint(x: 20.5 * unit, y: 16 * unit))
+            let style = StrokeStyle(lineWidth: 2.8 * unit, lineCap: .round, lineJoin: .round)
+            // The finished shape sits faintly behind, so the mark never vanishes.
+            context.stroke(tickPath, with: .color(Theme.track), style: style)
+            context.stroke(strikePath, with: .color(Theme.track), style: style)
+            context.opacity = opacity
+            if tick > 0 {
+                context.stroke(tickPath.trimmedPath(from: 0, to: tick), with: .color(Theme.accent), style: style)
+            }
+            if strike > 0 {
+                context.stroke(strikePath.trimmedPath(from: 0, to: strike), with: .color(Theme.accent), style: style)
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
