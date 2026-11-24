@@ -94,7 +94,7 @@ struct SignInView: View {
 
     private var serverStep: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Field(label: "Server address", note: "The address you open Sure with in a browser.") {
+            Field(label: "Server address", note: "The address you open Sure with in a browser.", isFocused: focus == .server) {
                 TextField("sure.example.com", text: $serverAddress)
                     .keyboardType(.URL)
                     .textContentType(.URL)
@@ -147,7 +147,7 @@ struct SignInView: View {
                     }
                 }
             case .password:
-                Field(label: "Email") {
+                Field(label: "Email", isFocused: focus == .email) {
                     TextField("you@example.com", text: $email)
                         .keyboardType(.emailAddress)
                         .textContentType(.username)
@@ -157,7 +157,7 @@ struct SignInView: View {
                         .submitLabel(.next)
                         .onSubmit { focus = .password }
                 }
-                Field(label: "Password") {
+                Field(label: "Password", isFocused: focus == .password) {
                     SecureField("Password", text: $password)
                         .textContentType(.password)
                         .focused($focus, equals: .password)
@@ -165,7 +165,7 @@ struct SignInView: View {
                         .onSubmit { signInWithPassword(on: server) }
                 }
                 if needsTwoFactor {
-                    Field(label: "Two-factor code", note: "From your authenticator app.") {
+                    Field(label: "Two-factor code", note: "From your authenticator app.", isFocused: focus == .code) {
                         TextField("123456", text: $otpCode)
                             .keyboardType(.numberPad)
                             .textContentType(.oneTimeCode)
@@ -181,7 +181,8 @@ struct SignInView: View {
             case .apiKey:
                 Field(
                     label: "API key",
-                    note: "Make one in Sure under Settings, API Key. A read-only key can show everything but change nothing."
+                    note: "Make one in Sure under Settings, API Key. A read-only key can show everything but change nothing.",
+                    isFocused: focus == .apiKey
                 ) {
                     HStack(spacing: 8) {
                         SecureField("Paste your key", text: $apiKey)
@@ -376,8 +377,10 @@ struct SignInView: View {
 private struct Field<Content: View>: View {
     let label: String
     var note: String?
+    /// Whether the input inside has the keyboard. The screen tracks focus
+    /// once, so the field is told rather than tracking it a second time.
+    var isFocused = false
     @ViewBuilder let content: Content
-    @FocusState private var isFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -386,7 +389,6 @@ private struct Field<Content: View>: View {
                 .foregroundStyle(Theme.text)
             content
                 .font(Theme.body)
-                .focused($isFocused)
                 .padding(.horizontal, 16)
                 .frame(minHeight: 54)
                 .background(Theme.surface, in: .rect(cornerRadius: Theme.controlRadius))

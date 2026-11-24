@@ -87,8 +87,19 @@ extension Color {
 
     /// A colour with separate values for light and dark appearance.
     init(light: UInt32, dark: UInt32) {
-        self.init(uiColor: UIColor { traits in
-            UIColor(Color(rgb: traits.userInterfaceStyle == .dark ? dark : light))
+        self = AdaptiveColor.make(light: UIColor(Color(rgb: light)), dark: UIColor(Color(rgb: dark)))
+    }
+}
+
+/// Builds colours that differ between light and dark appearance.
+///
+/// SwiftUI can ask for these on a background thread while it draws an
+/// animation. So the choice between the two is made in code that is not tied
+/// to the main thread; tying it there crashes the app mid-animation.
+nonisolated enum AdaptiveColor {
+    static func make(light: UIColor, dark: UIColor) -> Color {
+        Color(uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark ? dark : light
         })
     }
 }
@@ -104,16 +115,14 @@ struct Tint {
     /// contrast whatever the hue, in both light and dark appearance.
     init(hue: Double) {
         let h = hue.truncatingRemainder(dividingBy: 360) / 360
-        background = Color(uiColor: UIColor { traits in
-            traits.userInterfaceStyle == .dark
-                ? UIColor(hue: h, saturation: 0.55, brightness: 0.24, alpha: 1)
-                : UIColor(hue: h, saturation: 0.14, brightness: 0.99, alpha: 1)
-        })
-        ink = Color(uiColor: UIColor { traits in
-            traits.userInterfaceStyle == .dark
-                ? UIColor(hue: h, saturation: 0.35, brightness: 0.95, alpha: 1)
-                : UIColor(hue: h, saturation: 0.85, brightness: 0.42, alpha: 1)
-        })
+        background = AdaptiveColor.make(
+            light: UIColor(hue: h, saturation: 0.14, brightness: 0.99, alpha: 1),
+            dark: UIColor(hue: h, saturation: 0.55, brightness: 0.24, alpha: 1)
+        )
+        ink = AdaptiveColor.make(
+            light: UIColor(hue: h, saturation: 0.85, brightness: 0.42, alpha: 1),
+            dark: UIColor(hue: h, saturation: 0.35, brightness: 0.95, alpha: 1)
+        )
     }
 
     private init(background: Color, ink: Color) {
