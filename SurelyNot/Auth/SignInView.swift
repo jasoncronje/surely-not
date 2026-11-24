@@ -294,8 +294,10 @@ struct SignInView: View {
                 callback = try await webAuthentication.authenticate(
                     using: start,
                     callback: .customScheme(SingleSignOn.callbackScheme),
-                    // A private sheet, so nothing lingers in Safari afterwards.
-                    preferredBrowserSession: .ephemeral,
+                    // Shares Safari's sign-in, so someone already signed in to
+                    // their provider there is not asked again, and passkeys
+                    // behave as they do in Safari.
+                    preferredBrowserSession: .shared,
                     additionalHeaderFields: [:]
                 )
             } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
