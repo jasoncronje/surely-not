@@ -304,6 +304,11 @@ struct SignInView: View {
             switch SingleSignOn.outcome(from: callback) {
             case .code(let code):
                 try await session.signIn(serverURL: server.url, ssoCode: code)
+            case .twoFactorAccount:
+                // Go straight to the form that will work, with the code field showing.
+                method = .password
+                needsTwoFactor = true
+                errorMessage = "Sure does not allow \(provider.label.replacingOccurrences(of: "Sign in with ", with: "")) sign-in in apps for accounts with two-factor turned on. Use your email, password and code, or an API key."
             case .failed(let reason):
                 errorMessage = reason
             }

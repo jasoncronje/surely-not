@@ -401,6 +401,11 @@ private func decode<T: Decodable>(_ type: T.Type, _ json: String) throws -> T {
         #expect(reason.contains("not linked"))
     }
 
+    @Test func recognisesATwoFactorAccount() throws {
+        let url = try #require(URL(string: "sureapp://oauth/callback?error=mfa_not_supported&message=MFA%20users"))
+        #expect(SingleSignOn.outcome(from: url) == .twoFactorAccount)
+    }
+
     @Test func passesOnTheServersReason() throws {
         let url = try #require(URL(string: "sureapp://oauth/callback?error=sso_failed&message=Could%20not%20sign%20in"))
         #expect(SingleSignOn.outcome(from: url) == .failed("Could not sign in"))

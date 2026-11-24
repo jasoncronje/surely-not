@@ -82,6 +82,9 @@ nonisolated enum SingleSignOn {
 
     nonisolated enum Outcome: Equatable, Sendable {
         case code(String)
+        /// Sure refuses single sign-on in apps for accounts with two-factor
+        /// turned on. Those accounts sign in with email, password and code.
+        case twoFactorAccount
         case failed(String)
     }
 
@@ -114,7 +117,7 @@ nonisolated enum SingleSignOn {
             return .failed("That sign-in is not linked to a Sure account yet. Sign in to Sure in a browser once to link it, then try again.")
         }
         if value("error") == "mfa_not_supported" {
-            return .failed("Your account uses a two-factor code, so sign in with your email and password instead.")
+            return .twoFactorAccount
         }
         return .failed(value("message") ?? "The server did not finish signing you in.")
     }
