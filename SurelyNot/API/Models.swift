@@ -346,8 +346,25 @@ nonisolated struct TokenResponse: Decodable, Sendable {
     let refreshToken: String
 }
 
+/// A way to sign in through another service, such as Pocket ID or Google.
+nonisolated struct SSOProvider: Decodable, Sendable, Identifiable, Equatable {
+    let name: String
+    let label: String
+    var id: String { name }
+}
+
+nonisolated struct SSOProviderList: Decodable, Sendable {
+    let providers: [SSOProvider]
+}
+
+nonisolated struct SSOExchangeInput: Encodable, Sendable {
+    let code: String
+}
+
 nonisolated struct ErrorResponse: Decodable, Sendable {
     let error: String?
     let message: String?
     let errors: [String]?
+    /// Set when sign-in needs a two-factor code as well.
+    let mfaRequired: Bool?
 }

@@ -73,6 +73,53 @@ nonisolated enum ServerAddress {
     }
 }
 
+/// Signing in through another service (Pocket ID, Google and so on). The app
+/// opens the server's sign-in page, the server sends the browser back to
+/// `sureapp://oauth/callback` with a one-time code, and the app trades that
+/// code for tokens.
+nonisolated enum SingleSignOn {
+    static let callbackScheme = "sureapp"
+
+    nonisolated enum Outcome: Equatable, Sendable {
+        case code(String)
+        case failed(String)
+    }
+
+    /// The page to open in the sign-in browser sheet.
+    static func startURL(server: URL, provider: String, device: DeviceInfo) -> URL? {
+        var components = URLComponents(
+            url: server.appending(path: "auth/mobile/\(provider)"),
+            resolvingAgainstBaseURL: false
+        )
+        components?.queryItems = [
+            URLQueryItem(name: "device_id", value: device.deviceId),
+            URLQueryItem(name: "device_name", value: device.deviceName ?? "iPhone"),
+            URLQueryItem(name: "device_type", value: device.deviceType ?? "ios"),
+            URLQueryItem(name: "os_version", value: device.osVersion),
+            URLQueryItem(name: "app_version", value: device.appVersion),
+        ]
+        return components?.url
+    }
+
+    /// Reads what the server sent back at the end of sign-in.
+    static func outcome(from callback: URL) -> Outcome {
+        let items = URLComponents(url: callback, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        func value(_ name: String) -> String? {
+            items.first { $0.name == name }?.value.flatMap { $0.isEmpty ? nil : $0 }
+        }
+        if let code = value("code") {
+            return .code(code)
+        }
+        if value("status") == "account_not_linked" {
+            return .failed("That sign-in is not linked to a Sure account yet. Sign in to Sure in a browser once to link it, then try again.")
+        }
+        if value("error") == "mfa_not_supported" {
+            return .failed("Your account uses a two-factor code, so sign in with your email and password instead.")
+        }
+        return .failed(value("message") ?? "The server did not finish signing you in.")
+    }
+}
+
 /// Owns the signed-in state for the whole app.
 @Observable
 final class Session {
@@ -119,6 +166,12 @@ final class Session {
             otpCode: otpCode,
             device: Self.deviceInfo
         )
+        store(SavedSession(serverURL: serverURL, credential: credential))
+    }
+
+    func signIn(serverURL: URL, ssoCode: String) async throws {
+        let probe = APIClient(baseURL: serverURL, credential: nil, deviceID: Self.deviceID)
+        let credential = try await probe.exchangeSSO(code: ssoCode)
         store(SavedSession(serverURL: serverURL, credential: credential))
     }
 

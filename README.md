@@ -15,7 +15,7 @@ Four tabs, each backed by Sure's REST API (`/api/v1`):
 - **Budgets**: each month's budget with spending per category.
 - **Accounts**: accounts grouped by type, 90-day balance history, holdings, and transactions you can add, edit and delete.
 
-Sign in with your server address and either email and password (with a two-factor code if you use one) or an API key. Sign-in details are stored only in the iOS Keychain.
+Enter your server address, then sign in the way that server allows: single sign-on (Pocket ID, Google and so on), email and password (with a two-factor code if you use one), or an API key. Sign-in details are stored only in the iOS Keychain.
 
 ### Known limits
 
@@ -24,7 +24,7 @@ These come from what Sure's API offers:
 - Budgets and accounts are read-only. Create and change them in Sure on the web.
 - Chat replies are not streamed. The app checks for the reply every two seconds.
 - Only the first 50 messages of a very long chat are shown.
-- Single sign-on (SSO) is not supported yet. Use an API key if your server is SSO-only.
+- Single sign-on cannot link a new account or sign in an account that uses a two-factor code. Link the account in a browser first, or use email and password.
 - Plain `http://` works only for servers on your local network. Anything else needs `https://`.
 
 ## Building

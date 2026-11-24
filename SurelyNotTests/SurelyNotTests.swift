@@ -374,3 +374,41 @@ private func decode<T: Decodable>(_ type: T.Type, _ json: String) throws -> T {
         #expect(TextReveal.nextCount(current: 0, text: "hi there you") <= 8)
     }
 }
+
+@Suite struct SingleSignOnTests {
+    @Test func startAddressCarriesTheDevice() throws {
+        let server = try #require(URL(string: "https://sure.example.com"))
+        let device = DeviceInfo(deviceId: "abc", deviceName: "My iPhone", deviceType: "ios", osVersion: "26.0", appVersion: "0.1.0")
+        let url = try #require(SingleSignOn.startURL(server: server, provider: "openid_connect", device: device))
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        #expect(url.path() == "/auth/mobile/openid_connect")
+        #expect(items.first { $0.name == "device_id" }?.value == "abc")
+        #expect(items.first { $0.name == "device_name" }?.value == "My iPhone")
+        #expect(items.first { $0.name == "device_type" }?.value == "ios")
+    }
+
+    @Test func readsTheCodeFromTheCallback() throws {
+        let url = try #require(URL(string: "sureapp://oauth/callback?code=one-time"))
+        #expect(SingleSignOn.outcome(from: url) == .code("one-time"))
+    }
+
+    @Test func explainsAnUnlinkedAccount() throws {
+        let url = try #require(URL(string: "sureapp://oauth/callback?status=account_not_linked&linking_code=x"))
+        guard case .failed(let reason) = SingleSignOn.outcome(from: url) else {
+            Issue.record("expected a failure")
+            return
+        }
+        #expect(reason.contains("not linked"))
+    }
+
+    @Test func passesOnTheServersReason() throws {
+        let url = try #require(URL(string: "sureapp://oauth/callback?error=sso_failed&message=Could%20not%20sign%20in"))
+        #expect(SingleSignOn.outcome(from: url) == .failed("Could not sign in"))
+    }
+
+    @Test func twoFactorFlagIsRead() throws {
+        let data = Data(#"{"error":"Two-factor authentication required","mfa_required":true}"#.utf8)
+        let body = try APIClient.decoder.decode(ErrorResponse.self, from: data)
+        #expect(body.mfaRequired == true)
+    }
+}

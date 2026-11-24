@@ -12,6 +12,8 @@ nonisolated struct APIError: LocalizedError, Sendable {
     /// HTTP status, or nil when the request never reached the server.
     let status: Int?
     let message: String
+    /// The server wants a two-factor code before it will sign this person in.
+    var needsTwoFactor = false
 
     var errorDescription: String? { message }
     var isUnauthorized: Bool { status == 401 }
@@ -161,7 +163,12 @@ final class APIClient {
         if http.statusCode == 401, credential != nil {
             onSessionExpired?()
         }
-        throw APIError(status: http.statusCode, message: Self.message(for: http.statusCode, data: data))
+        let needsTwoFactor = (try? Self.decoder.decode(ErrorResponse.self, from: data))?.mfaRequired ?? false
+        throw APIError(
+            status: http.statusCode,
+            message: Self.message(for: http.statusCode, data: data),
+            needsTwoFactor: needsTwoFactor
+        )
     }
 
     /// Exchanges the refresh token for new tokens. Requests that fail at the
@@ -224,6 +231,18 @@ extension APIClient {
     func login(email: String, password: String, otpCode: String?, device: DeviceInfo) async throws -> Credential {
         let input = LoginInput(email: email, password: password, otpCode: otpCode, device: device)
         let tokens: TokenResponse = try await send("POST", "auth/login", body: input)
+        return .token(access: tokens.accessToken, refresh: tokens.refreshToken)
+    }
+
+    /// The other services this server lets people sign in with. Needs no sign-in.
+    func ssoProviders() async throws -> [SSOProvider] {
+        let list: SSOProviderList = try await get("auth/sso_providers")
+        return list.providers
+    }
+
+    /// Trades the one-time code from a finished single sign-on for tokens.
+    func exchangeSSO(code: String) async throws -> Credential {
+        let tokens: TokenResponse = try await send("POST", "auth/sso_exchange", body: SSOExchangeInput(code: code))
         return .token(access: tokens.accessToken, refresh: tokens.refreshToken)
     }
 
