@@ -37,7 +37,7 @@ struct WelcomeView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shown = false
 
-    static let sureProject = URL(string: "https://github.com/we-promise/sure")!
+    static let sureProject = URL(string: "https://sure.am")!
 
     /// One sentence on what this is, with "Sure" linking to the project.
     private static var pitch: AttributedString {
