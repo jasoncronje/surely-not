@@ -67,6 +67,8 @@ nonisolated struct TransactionFilter: Equatable, Hashable, Sendable {
     var account: AccountRef?
     var category: CategoryRef?
     var merchant: MerchantRef?
+    /// The smallest and largest amount to include, in whole currency units.
+    var amounts: ClosedRange<Decimal>?
 
     /// True when nothing narrows the list.
     var isEmpty: Bool { self == TransactionFilter() }
@@ -83,6 +85,8 @@ nonisolated struct TransactionFilter: Equatable, Hashable, Sendable {
             "account_id": account?.id,
             "category_id": category?.id,
             "merchant_id": merchant?.id,
+            "min_amount": amounts.map { "\($0.lowerBound)" },
+            "max_amount": amounts.map { "\($0.upperBound)" },
         ]
     }
 }

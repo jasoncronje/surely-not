@@ -487,3 +487,155 @@ private func decode<T: Decodable>(_ type: T.Type, _ json: String) throws -> T {
         #expect(transaction.kindLabel == nil)
     }
 }
+
+@Suite struct BillTests {
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        return calendar
+    }
+
+    private func day(_ text: String) throws -> Date {
+        try #require(Day.date(text))
+    }
+
+    private func bill(
+        id: String = "b1",
+        cents: Int = 1299,
+        day: Int = 5,
+        status: String = "active",
+        type: String = "subscription",
+        account: String = "a1",
+        name: String? = "Music",
+        max: Int? = nil
+    ) throws -> Bill {
+        try decode(Bill.self, """
+        {"id":"\(id)","amount":"$12.99","amount_cents":\(cents),"currency":"USD",
+         "expected_day_of_month":\(day),"last_occurrence_date":"2026-10-05",
+         "next_expected_date":"2026-11-05","status":"\(status)","occurrence_count":3,
+         "name":\(name.map { "\"\($0)\"" } ?? "null"),"manual":false,"payment_url":null,"autopay":true,"notes":"",
+         "expected_amount_min_cents":\(cents),"expected_amount_max_cents":\(max ?? cents),
+         "bill_type":"\(type)","recurrence_rules":[],
+         "account":{"id":"\(account)","name":"Card","account_type":"credit_card"},
+         "merchant":{"id":"m1","name":"Tunes"}}
+        """)
+    }
+
+    private func payment(
+        id: String = "t1",
+        date: String,
+        cents: Int = 1299,
+        account: String = "a1",
+        classification: String = "expense"
+    ) throws -> Transaction {
+        try decode(Transaction.self, """
+        {"id":"\(id)","date":"\(date)","amount":"$12.99","amount_cents":\(cents),"currency":"USD",
+         "name":"Tunes","classification":"\(classification)",
+         "account":{"id":"\(account)","name":"Card","account_type":"credit_card"}}
+        """)
+    }
+
+    @Test func aBillWithoutANameUsesItsMerchant() throws {
+        #expect(try bill(name: nil).title == "Tunes")
+        #expect(try bill().title == "Music")
+    }
+
+    @Test func aDayPastTheEndOfTheMonthFallsOnItsLastDay() throws {
+        let due = try #require(BillSchedule.dueDate(day: 31, inMonthOf: day("2026-11-10"), calendar: calendar))
+        #expect(Day.string(due) == "2026-11-30")
+    }
+
+    @Test func aMatchingPaymentMarksTheBillPaid() throws {
+        let statuses = BillSchedule.statuses(
+            bills: [try bill()],
+            transactions: [try payment(date: "2026-11-06")],
+            now: try day("2026-11-24"),
+            calendar: calendar
+        )
+        #expect(statuses.count == 1)
+        #expect(statuses[0].isPaid)
+        #expect(statuses[0].dueDate == "2026-11-05")
+    }
+
+    @Test func lastMonthsPaymentDoesNotCount() throws {
+        let statuses = BillSchedule.statuses(
+            bills: [try bill()],
+            transactions: [try payment(date: "2026-10-05")],
+            now: try day("2026-11-24"),
+            calendar: calendar
+        )
+        #expect(statuses[0].state == .late(daysAgo: 19))
+    }
+
+    @Test func anotherAccountOrAmountDoesNotCount() throws {
+        let statuses = BillSchedule.statuses(
+            bills: [try bill()],
+            transactions: [
+                try payment(id: "t1", date: "2026-11-05", account: "a2"),
+                try payment(id: "t2", date: "2026-11-05", cents: 2599),
+                try payment(id: "t3", date: "2026-11-05", classification: "income"),
+            ],
+            now: try day("2026-11-03"),
+            calendar: calendar
+        )
+        #expect(statuses[0].state == .due(daysAway: 2))
+    }
+
+    @Test func aSlightlyDifferentAmountStillCounts() throws {
+        let statuses = BillSchedule.statuses(
+            bills: [try bill(cents: 10000, max: 11000)],
+            transactions: [try payment(date: "2026-11-04", cents: 11400)],
+            now: try day("2026-11-24"),
+            calendar: calendar
+        )
+        #expect(statuses[0].isPaid)
+        #expect(statuses[0].cents == 11400)
+    }
+
+    @Test func onePaymentPaysOnlyOneBill() throws {
+        let statuses = BillSchedule.statuses(
+            bills: [try bill(id: "b1"), try bill(id: "b2")],
+            transactions: [try payment(date: "2026-11-05")],
+            now: try day("2026-11-24"),
+            calendar: calendar
+        )
+        #expect(statuses.filter(\.isPaid).count == 1)
+    }
+
+    @Test func onlyConfirmedBillsGetAStanding() throws {
+        let statuses = BillSchedule.statuses(
+            bills: [try bill(id: "b1", status: "suggested"), try bill(id: "b2", status: "inactive")],
+            transactions: [],
+            now: try day("2026-11-24"),
+            calendar: calendar
+        )
+        #expect(statuses.isEmpty)
+    }
+
+    @Test func suggestionsDropRepeatsAndConfirmedBills() throws {
+        let suggestions = BillSchedule.suggestions(from: [
+            try bill(id: "b1"),
+            try bill(id: "b2", status: "suggested"),
+            try bill(id: "b3", cents: 500, status: "suggested"),
+            try bill(id: "b4", cents: 500, status: "suggested", name: nil),
+        ])
+        #expect(suggestions.map(\.id) == ["b3"])
+    }
+
+    @Test func theStatusLineReadsPlainly() throws {
+        let now = try day("2026-11-24")
+        let music = try bill()
+        #expect(BillStatus(bill: music, dueDate: "2026-11-24", state: .due(daysAway: 0)).line(now: now) == "Due today")
+        #expect(BillStatus(bill: music, dueDate: "2026-11-27", state: .due(daysAway: 3)).line(now: now) == "Due in 3 days")
+        let paid = BillStatus(bill: music, dueDate: "2026-11-05", state: .paid(try payment(date: "2026-11-06")))
+        #expect(paid.line(now: now).hasPrefix("Paid"))
+    }
+
+    @Test func anAmountRangeGoesIntoTheQuery() {
+        var filter = TransactionFilter()
+        filter.amounts = Decimal(string: "236.85")!...Decimal(string: "261.79")!
+        let query = filter.query().compactMapValues { $0 }
+        #expect(query["min_amount"] == "236.85")
+        #expect(query["max_amount"] == "261.79")
+    }
+}

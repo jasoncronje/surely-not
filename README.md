@@ -11,6 +11,7 @@ Early, version 0.1. It builds and its unit tests pass, but it has not been relea
 Four tabs, each backed by Sure's REST API (`/api/v1`):
 
 - **Overview**: net worth, this month's income and spending, spending compared with normal, the latest transactions, and insights. Tap a category to see the transactions behind it.
+- **Bills**: this month's confirmed repeating payments, what is still to pay, and what has been paid. The app finds each payment in your transactions itself, because Sure's own record of the last payment can lag. Reached from Overview. Suggested repeating payments are listed but are confirmed in Sure on the web.
 - **Transactions**: every transaction across your accounts, with search and filters for period, type, account and category. Each one opens a detail screen with its notes, tags and links to everything else at that merchant, in that category or in that account.
 - **Chat**: Sure's AI assistant. Start, rename and delete chats, send messages, retry failed replies.
 - **Budgets**: each month's budget with spending per category. Tap a category to see that month's transactions in it.

@@ -191,6 +191,81 @@ nonisolated struct TransactionEnvelope: Encodable, Sendable {
     let transaction: TransactionInput
 }
 
+// MARK: - Bills
+
+/// A payment Sure expects to repeat, such as a subscription or a loan.
+nonisolated struct Bill: Decodable, Sendable, Identifiable, Hashable {
+    /// One repetition pattern. No rules at all means monthly on `expectedDayOfMonth`.
+    nonisolated struct Rule: Decodable, Sendable, Hashable {
+        let frequency: String?
+        let interval: Int?
+    }
+
+    let id: String
+    let amount: String
+    let amountCents: Int
+    let currency: String
+    let expectedDayOfMonth: Int
+    let lastOccurrenceDate: String?
+    let nextExpectedDate: String?
+    /// `suggested`, `active`, `paused`, `inactive` or `ended`.
+    let status: String
+    let occurrenceCount: Int?
+    let name: String?
+    let paymentUrl: String?
+    let autopay: Bool?
+    let notes: String?
+    /// `bill`, `subscription`, `installment`, `income`, `transfer` or `other`.
+    let billType: String?
+    let expectedAmountMinCents: Int?
+    let expectedAmountMaxCents: Int?
+    let recurrenceRules: [Rule]?
+    let account: AccountRef?
+    let merchant: MerchantRef?
+
+    /// Sure leaves the name empty when the bill is known by its merchant.
+    var title: String {
+        if let name, !name.trimmingCharacters(in: .whitespaces).isEmpty { return name }
+        return merchant?.name ?? "Unnamed"
+    }
+
+    var isActive: Bool { status == "active" }
+    var isSuggestion: Bool { status == "suggested" }
+    /// Money arriving, such as a salary, instead of money owed.
+    var isIncome: Bool { billType == "income" }
+
+    /// True for the plain case: once a month on a fixed day.
+    var isMonthly: Bool {
+        guard let rules = recurrenceRules, !rules.isEmpty else { return true }
+        return rules.count == 1 && rules[0].frequency == "monthly" && (rules[0].interval ?? 1) == 1
+    }
+
+    /// The amount without Sure's minus sign for money coming in.
+    var displayAmount: String {
+        let unsigned = amount.replacingOccurrences(of: "-", with: "")
+        return isIncome ? "+\(unsigned)" : unsigned
+    }
+
+    /// The smallest and largest amount a payment of this bill has been, in cents.
+    var amountRange: ClosedRange<Int> {
+        let usual = abs(amountCents)
+        let low = abs(expectedAmountMinCents ?? usual)
+        let high = abs(expectedAmountMaxCents ?? usual)
+        return min(low, high, usual)...max(low, high, usual)
+    }
+
+    var typeLabel: String {
+        switch billType {
+        case "subscription": "Subscription"
+        case "installment": "Instalment"
+        case "income": "Money in"
+        case "transfer": "Transfer"
+        case "bill": "Bill"
+        default: "Repeating payment"
+        }
+    }
+}
+
 // MARK: - Overview
 
 nonisolated struct Money: Decodable, Sendable {

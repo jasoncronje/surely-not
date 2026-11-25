@@ -297,6 +297,12 @@ extension APIClient {
         return try await get("transactions", query: query)
     }
 
+    /// Every repeating payment Sure knows of, confirmed or only suggested.
+    func bills() async throws -> [Bill] {
+        let page: Page<Bill> = try await get("recurring_transactions", query: ["per_page": "100"])
+        return page.items
+    }
+
     func createTransaction(_ input: TransactionInput) async throws -> Transaction {
         try await send("POST", "transactions", body: TransactionEnvelope(transaction: input))
     }
