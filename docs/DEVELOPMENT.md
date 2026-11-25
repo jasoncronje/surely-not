@@ -70,6 +70,17 @@ How it behaves:
 
 The code is in `SurelyNot/Wallet`, and the extension's entry point in `SurelyNotWalletSync`. `FinanceKitSource.swift` and the extension's `WalletSyncExtension.swift` are the only files that touch FinanceKit; the rest is tested against a pretend Wallet and a pretend Sure in `SurelyNotTests/WalletTests.swift` and `SurelyNotTests/WalletBackgroundTests.swift`.
 
+## iPhone Duo and wide screens
+
+On iPhone Duo the app moves between the outer display (phone-sized) and the inner one (wide) as it folds and unfolds, without restarting. Screens size themselves from the space they get, never from the device, its orientation or `UIScreen`. The pieces are in `SurelyNot/Support/Adaptive.swift`:
+
+- `screenColumn()` gives every screen its margin and caps it at a readable width (720 pt), centred, so cards never stretch across a wide display.
+- `WideColumns` puts two groups of cards side by side from 700 pt wide, and one above the other below that. Home and Plan use it. Both arrangements keep the same views, so folding does not reload anything.
+- `ListDetailStack` shows Activity as a list with the transaction beside it when the width is regular, and the usual pushed screen on a phone.
+- The tab bar uses `.sidebarAdaptable`, so with room to spare the tabs can open out into a sidebar.
+
+On a phone none of this changes anything. Test in Xcode's iPhone Duo simulator, folded and unfolded.
+
 ## Design
 
 The look is defined in `SurelyNot/Support/Theme.swift` and the shared pieces in `SurelyNot/Support/Components.swift`. The rules: colour belongs on data, not on buttons and bars; one blue marks the main thing a screen is about; categories and institutions get a pale tint of their own colour; surfaces are flat with one large corner radius; red is kept for what is over or wrong.

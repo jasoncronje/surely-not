@@ -43,7 +43,7 @@ struct InvestmentsView: View {
                     }
                 }
             }
-            .padding(.horizontal, Theme.margin)
+            .screenColumn()
             .padding(.bottom, Theme.bottomRoom)
         }
         .screenBackground()
@@ -204,7 +204,7 @@ private struct PositionView: View {
                     }
                 }
             }
-            .padding(.horizontal, Theme.margin)
+            .screenColumn()
             .padding(.bottom, Theme.bottomRoom)
         }
         .screenBackground()

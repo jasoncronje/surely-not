@@ -138,21 +138,26 @@ struct PlanView: View {
                         }
                     }
                     .padding(.top, 8)
-                    LoadableView(state: model.budgets, retry: model.load) { budgets in
-                        if let budget = model.selected {
-                            LoadableView(state: model.detail, placeholderLines: 6, retry: model.loadDetail) { detail in
-                                BudgetContent(client: client, budget: budget, detail: detail)
-                            }
-                        } else if budgets.isEmpty {
-                            Card {
-                                EmptyNote(text: "No budgets yet. Create one in Sure on the web. This app can show budgets but not change them.")
+                    // Budgets and bills side by side on a wide screen such as
+                    // iPhone Duo's inner display.
+                    WideColumns {
+                        LoadableView(state: model.budgets, retry: model.load) { budgets in
+                            if let budget = model.selected {
+                                LoadableView(state: model.detail, placeholderLines: 6, retry: model.loadDetail) { detail in
+                                    BudgetContent(client: client, budget: budget, detail: detail)
+                                }
+                            } else if budgets.isEmpty {
+                                Card {
+                                    EmptyNote(text: "No budgets yet. Create one in Sure on the web. This app can show budgets but not change them.")
+                                }
                             }
                         }
+                    } trailing: {
+                        BillsBlock(client: client, model: bills)
+                            .padding(.top, 8)
                     }
-                    BillsBlock(client: client, model: bills)
-                        .padding(.top, 8)
                 }
-                .padding(.horizontal, Theme.margin)
+                .screenColumn(maxWidth: Theme.wideColumnWidth)
                 .padding(.bottom, Theme.bottomRoom)
             }
             .screenBackground()

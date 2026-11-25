@@ -91,9 +91,9 @@ struct WelcomeView: View {
             }
             .opacity(shown ? 1 : 0)
         }
-        .padding(.horizontal, 24)
         .padding(.bottom, 8)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .screenColumn(margin: 24, maxWidth: Theme.formWidth)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .screenBackground()
         .toolbarVisibility(.hidden, for: .navigationBar)
         .onAppear {

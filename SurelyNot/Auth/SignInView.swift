@@ -53,7 +53,7 @@ struct SignInView: View {
                         .transition(.opacity.combined(with: .offset(y: 12)))
                 }
             }
-            .padding(.horizontal, 24)
+            .screenColumn(margin: 24, maxWidth: Theme.formWidth)
             .padding(.top, 56)
             .padding(.bottom, 24)
         }

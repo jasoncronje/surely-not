@@ -170,7 +170,7 @@ struct AccountDetailView: View {
                         .task { await model.loadMoreTransactions() }
                 }
             }
-            .padding(.horizontal, Theme.margin)
+            .screenColumn()
             .padding(.bottom, Theme.bottomRoom)
         }
         .screenBackground()

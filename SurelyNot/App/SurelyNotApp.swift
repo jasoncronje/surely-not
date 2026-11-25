@@ -100,8 +100,16 @@ struct MainTabView: View {
                 OverviewView(client: client)
             }
             Tab("Activity", systemImage: "arrow.left.arrow.right") {
-                NavigationStack {
+                // On a wide screen such as iPhone Duo's inner display, a
+                // transaction opens beside the list instead of over it.
+                ListDetailStack {
                     TransactionsView(client: client, title: "Activity", isRoot: true)
+                } placeholder: {
+                    DetailPlaceholder(
+                        title: "No transaction picked",
+                        systemImage: "arrow.left.arrow.right",
+                        note: "Pick a transaction to see it here."
+                    )
                 }
             }
             Tab("Plan", systemImage: "calendar") {
@@ -117,6 +125,9 @@ struct MainTabView: View {
         // The tab bar shrinks out of the way while reading down a screen and
         // comes back on scrolling up.
         .tabBarMinimizeBehavior(.onScrollDown)
+        // On a phone this is the usual tab bar. With room to spare, as on
+        // iPhone Duo's inner display, the tabs can open out into a sidebar.
+        .tabViewStyle(.sidebarAdaptable)
         .modifier(SampleAccessory(isSample: client.isSample))
         .environment(changes)
         .environment(categoryChanger)

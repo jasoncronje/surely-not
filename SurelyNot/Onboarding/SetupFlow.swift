@@ -102,14 +102,14 @@ private struct SetupExtrasView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 24)
+                .screenColumn(margin: 24, maxWidth: Theme.formWidth)
                 .padding(.top, 56)
                 .padding(.bottom, 24)
             }
 
             Button("Continue", action: done)
                 .buttonStyle(PrimaryButtonStyle(fullWidth: true))
-                .padding(.horizontal, 24)
+                .screenColumn(margin: 24, maxWidth: Theme.formWidth)
                 .padding(.bottom, 8)
         }
         .sensoryFeedback(.selection, trigger: remindersOn)
@@ -218,7 +218,7 @@ private struct SetupReadyView: View {
             Button("Open Home", action: done)
                 .buttonStyle(PrimaryButtonStyle(fullWidth: true))
         }
-        .padding(.horizontal, 24)
+        .screenColumn(margin: 24, maxWidth: Theme.formWidth)
         .padding(.bottom, 8)
         .sensoryFeedback(.success, trigger: shown)
         .task {

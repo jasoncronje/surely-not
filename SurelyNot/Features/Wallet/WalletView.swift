@@ -36,7 +36,7 @@ struct WalletView: View {
                     }
                 }
             }
-            .padding(.horizontal, Theme.margin)
+            .screenColumn()
             .padding(.top, 8)
             .padding(.bottom, Theme.bottomRoom)
         }
@@ -375,7 +375,7 @@ struct WalletSetupView: View {
                         }
                     }
                 }
-                .padding(.horizontal, Theme.margin)
+                .screenColumn()
                 .padding(.top, 8)
                 .padding(.bottom, 24)
             }
@@ -527,7 +527,7 @@ struct WalletSetupView: View {
             }
             .disabled(selected.isEmpty && !wallet.isWorking)
         }
-        .padding(.horizontal, Theme.margin)
+        .screenColumn()
         .padding(.top, 12)
         .padding(.bottom, 8)
         .background(Theme.ground)
@@ -604,7 +604,7 @@ struct WalletReviewView: View {
                     Notice(problem)
                 }
             }
-            .padding(.horizontal, Theme.margin)
+            .screenColumn()
             .padding(.bottom, Theme.bottomRoom)
         }
         .screenBackground()

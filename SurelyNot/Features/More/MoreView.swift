@@ -46,7 +46,7 @@ struct MoreView: View {
                         }
                     }
                 }
-                .padding(.horizontal, Theme.margin)
+                .screenColumn()
                 .padding(.bottom, Theme.bottomRoom)
             }
             .screenBackground()

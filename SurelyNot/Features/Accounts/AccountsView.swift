@@ -167,7 +167,7 @@ struct AccountsView: View {
                     .buttonStyle(.plain)
                     .padding(.top, 8)
                 }
-                .padding(.horizontal, Theme.margin)
+                .screenColumn()
                 .padding(.bottom, Theme.bottomRoom)
             }
             .screenBackground()

@@ -165,7 +165,7 @@ struct BillsView: View {
                     }
                 }
             }
-            .padding(.horizontal, Theme.margin)
+            .screenColumn()
             .padding(.bottom, Theme.bottomRoom)
         }
         .screenBackground()
@@ -303,7 +303,7 @@ private struct SuggestionsView: View {
                 }
                 .rowGroup()
             }
-            .padding(.horizontal, Theme.margin)
+            .screenColumn()
             .padding(.bottom, Theme.bottomRoom)
         }
         .screenBackground()
@@ -558,7 +558,7 @@ struct BillDetailView: View {
                     .disabled(isChanging)
                 }
             }
-            .padding(.horizontal, Theme.margin)
+            .screenColumn()
             .padding(.bottom, Theme.bottomRoom)
         }
         .screenBackground()

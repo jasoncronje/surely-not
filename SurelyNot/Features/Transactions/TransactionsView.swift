@@ -160,7 +160,7 @@ struct TransactionsView: View {
                         .task { await model.loadMore() }
                 }
             }
-            .padding(.horizontal, Theme.margin)
+            .screenColumn()
             .padding(.bottom, Theme.bottomRoom)
         }
         .screenBackground()
@@ -271,7 +271,7 @@ struct TransactionsView: View {
                     .accessibilityLabel("Stop filtering by \(merchant.name)")
                 }
             }
-            .padding(.horizontal, Theme.margin)
+            .screenColumn()
         }
         .scrollIndicators(.hidden)
         // The row of chips runs to the screen edges, past the page margin.

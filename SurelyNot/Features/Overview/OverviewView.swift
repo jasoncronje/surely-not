@@ -106,31 +106,36 @@ struct OverviewView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.gap) {
                     header
-                    Card {
-                        LoadableView(state: model.balanceSheet, retry: model.loadBalanceSheet) { sheet in
-                            NetWorthContent(sheet: sheet)
+                    // Side by side on a wide screen such as iPhone Duo's inner
+                    // display: what you have on the left, what happened on the right.
+                    WideColumns {
+                        Card {
+                            LoadableView(state: model.balanceSheet, retry: model.loadBalanceSheet) { sheet in
+                                NetWorthContent(sheet: sheet)
+                            }
                         }
-                    }
-                    Card {
-                        LoadableView(state: model.cashFlow, placeholderLines: 5, retry: model.loadCashFlow) { flow in
-                            CashFlowContent(flow: flow)
+                        Card {
+                            LoadableView(state: model.cashFlow, placeholderLines: 5, retry: model.loadCashFlow) { flow in
+                                CashFlowContent(flow: flow)
+                            }
                         }
-                    }
-                    Card(title: "Against your normal") {
-                        LoadableView(state: model.spending, placeholderLines: 5, retry: model.loadSpending) { spending in
-                            SpendingContent(client: client, spending: spending)
+                        Card(title: "Against your normal") {
+                            LoadableView(state: model.spending, placeholderLines: 5, retry: model.loadSpending) { spending in
+                                SpendingContent(client: client, spending: spending)
+                            }
                         }
-                    }
-                    recentTransactions
-                    Card(title: "Insights") {
-                        LoadableView(state: model.insights, retry: model.loadInsights) { insights in
-                            InsightsContent(insights: insights) { insight in
-                                Task { await model.dismiss(insight) }
+                    } trailing: {
+                        recentTransactions
+                        Card(title: "Insights") {
+                            LoadableView(state: model.insights, retry: model.loadInsights) { insights in
+                                InsightsContent(insights: insights) { insight in
+                                    Task { await model.dismiss(insight) }
+                                }
                             }
                         }
                     }
                 }
-                .padding(.horizontal, Theme.margin)
+                .screenColumn(maxWidth: Theme.wideColumnWidth)
                 .padding(.bottom, Theme.bottomRoom)
             }
             .screenBackground()

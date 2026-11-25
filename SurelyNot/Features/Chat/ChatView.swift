@@ -260,7 +260,7 @@ struct ChatView: View {
                     }
                 }
             }
-            .padding(.horizontal, Theme.margin)
+            .screenColumn()
             .padding(.vertical, 12)
         }
         .defaultScrollAnchor(.bottom)
@@ -330,7 +330,7 @@ struct ChatView: View {
             .buttonStyle(IconButtonStyle(isProminent: true))
             .disabled(!canSend)
         }
-        .padding(.horizontal, Theme.margin)
+        .screenColumn()
         .padding(.vertical, 8)
         .background(Theme.ground)
     }
