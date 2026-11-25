@@ -131,7 +131,7 @@ struct AccountsView: View {
                     LoadableView(state: model.summary, placeholderLines: 6, retry: model.load) { summary in
                         if summary.groups.isEmpty {
                             Card {
-                                EmptyNote(text: "No accounts yet. Add them in Sure on the web, or connect Apple Wallet below.")
+                                EmptyNote(text: "No accounts yet. Connect Apple Wallet, or add them in Sure on the web.")
                             }
                         }
                         if summary.assets != nil || summary.debts != nil {
@@ -143,6 +143,14 @@ struct AccountsView: View {
                                 .foregroundStyle(Theme.muted)
                                 .padding(.horizontal, 4)
                         }
+                        // Wallet sync is what the app adds over Sure on the web,
+                        // so it sits right under the totals.
+                        NavigationLink {
+                            WalletView(client: client)
+                        } label: {
+                            WalletEntryRow()
+                        }
+                        .buttonStyle(.plain)
                         if summary.hasInvestments {
                             NavigationLink {
                                 InvestmentsView(client: client)
@@ -157,13 +165,6 @@ struct AccountsView: View {
                             groupCard(group)
                         }
                     }
-                    NavigationLink {
-                        WalletView(client: client)
-                    } label: {
-                        WalletEntryRow()
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.top, 8)
                 }
                 .padding(.horizontal, Theme.margin)
                 .padding(.bottom, Theme.bottomRoom)
