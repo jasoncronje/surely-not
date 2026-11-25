@@ -123,6 +123,42 @@ struct SettingsView: View {
         })
     }
 
+    @State private var remindersOn = BillReminders.isEnabled
+    @State private var remindersWaiting = 0
+    @State private var remindersRefused = false
+
+    /// Flipping the switch asks iOS for permission before it stays on.
+    private var remindersBinding: Binding<Bool> {
+        Binding(get: { remindersOn }, set: { wanted in
+            remindersOn = wanted
+            Task {
+                if wanted {
+                    if await BillReminders.enable() {
+                        // Loading the bills is what puts the reminders in place.
+                        if let client = session.client {
+                            await BillsModel(client: client).load()
+                        }
+                    } else {
+                        remindersOn = false
+                        remindersRefused = true
+                    }
+                } else {
+                    await BillReminders.disable()
+                }
+                remindersWaiting = await BillReminders.waitingCount()
+            }
+        })
+    }
+
+    private var remindersNote: String {
+        guard remindersOn else { return "A notification at 9 in the morning, the day before each bill." }
+        switch remindersWaiting {
+        case 0: return "On. Nothing is due soon."
+        case 1: return "On. 1 reminder is waiting."
+        default: return "On. \(remindersWaiting) reminders are waiting."
+        }
+    }
+
     private var lockErrorShown: Binding<Bool> {
         Binding(
             get: { !(lock.error ?? "").isEmpty },
@@ -162,6 +198,19 @@ struct SettingsView: View {
                         }
                         .tint(Theme.accent)
                     }
+                    Card {
+                        Toggle(isOn: remindersBinding) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Bill reminders")
+                                    .font(Theme.bodyStrong)
+                                    .foregroundStyle(Theme.text)
+                                Text(remindersNote)
+                                    .font(Theme.small)
+                                    .foregroundStyle(Theme.muted)
+                            }
+                        }
+                        .tint(Theme.accent)
+                    }
                     Button("Sign out") {
                         session.signOut()
                     }
@@ -176,6 +225,12 @@ struct SettingsView: View {
             .screenBackground()
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
+            .task { remindersWaiting = await BillReminders.waitingCount() }
+            .alert("Notifications are off", isPresented: $remindersRefused) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Allow notifications for Surely Not in the Settings app, then turn reminders on again.")
+            }
             .alert("The lock was not changed", isPresented: lockErrorShown) {
                 Button("OK", role: .cancel) {}
             } message: {

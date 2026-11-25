@@ -189,6 +189,7 @@ final class Session {
     func signOut() {
         KeychainStore.clear()
         WidgetFeed.clear()
+        Task { await BillReminders.removeAll() }
         client = nil
         serverURL = nil
     }

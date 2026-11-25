@@ -815,6 +815,37 @@ private func decode<T: Decodable>(_ type: T.Type, _ json: String) throws -> T {
         #expect(json == #"{"transaction":{"category_id":"c1"}}"#)
     }
 
+    @Test func remindersCoverUnpaidBillsAndNextMonth() throws {
+        let now = try #require(calendar.date(bySettingHour: 12, minute: 0, second: 0, of: try day("2026-11-24")))
+        let rent = try bill(id: "b1", day: 26)
+        let paid = try bill(id: "b2", day: 5)
+        let late = try bill(id: "b3", day: 23)
+        let plan = BillReminders.plan(
+            statuses: [
+                BillStatus(bill: rent, dueDate: "2026-11-26", state: .due(daysAway: 2)),
+                BillStatus(bill: paid, dueDate: "2026-11-05", state: .paid(try payment(date: "2026-11-05"))),
+                BillStatus(bill: late, dueDate: "2026-11-23", state: .late(daysAgo: 1)),
+            ],
+            now: now,
+            calendar: calendar
+        )
+        #expect(plan.map(\.id) == ["bill-b1-2026-11", "bill-b2-2026-12", "bill-b3-2026-12", "bill-b1-2026-12"])
+        let first = try #require(plan.first)
+        #expect(Day.string(first.fireDate) == "2026-11-25")
+        #expect(calendar.component(.hour, from: first.fireDate) == 9)
+        #expect(first.title == "Music comes out tomorrow")
+    }
+
+    @Test func noReminderOnceItsMorningHasPassed() throws {
+        let now = try #require(calendar.date(bySettingHour: 10, minute: 0, second: 0, of: try day("2026-11-25")))
+        let plan = BillReminders.plan(
+            statuses: [BillStatus(bill: try bill(id: "b1", day: 26), dueDate: "2026-11-26", state: .due(daysAway: 1))],
+            now: now,
+            calendar: calendar
+        )
+        #expect(plan.map(\.id) == ["bill-b1-2026-12"])
+    }
+
     @Test func anAmountRangeGoesIntoTheQuery() {
         var filter = TransactionFilter()
         filter.amounts = Decimal(string: "236.85")!...Decimal(string: "261.79")!

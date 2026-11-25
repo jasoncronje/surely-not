@@ -22,6 +22,7 @@
 		32F4AF9CFD8C33FDE6E9ED7F /* InvestmentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA557AD334CA69BC5514524F /* InvestmentsView.swift */; };
 		408A945C24F6B74C0723814C /* FinanceKitSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CE0D60A1B226217694B54F0 /* FinanceKitSource.swift */; };
 		412199E930B7A2A295098EB7 /* AccountsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0938E34FBAE12B653508F4CE /* AccountsView.swift */; };
+		45497040DCBCCA45226F1337 /* BillReminders.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6EB416CB2EDA61AD76880D4 /* BillReminders.swift */; };
 		48F4217D112121D00D4DA378 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86D0CF2AC0975810E329A155 /* Session.swift */; };
 		505D17BCE113B0DB6CE81A70 /* WalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C621F1AF5BCA81DC8F4F446 /* WalletView.swift */; };
 		539E90A967744BFE46C85B22 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 590161F90D4418956DFE9AF7 /* Assets.xcassets */; };
@@ -134,6 +135,7 @@
 		E106363FDAD77D35497D5B88 /* Manrope.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Manrope.ttf; sourceTree = "<group>"; };
 		E333C0CEFA5A807E01EEE461 /* Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatting.swift; sourceTree = "<group>"; };
 		EA557AD334CA69BC5514524F /* InvestmentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InvestmentsView.swift; sourceTree = "<group>"; };
+		F6EB416CB2EDA61AD76880D4 /* BillReminders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BillReminders.swift; sourceTree = "<group>"; };
 		F8E9480CCBDB77A763941886 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		FF7AD9F5A54ABDCD8BC30A60 /* SurelyNot.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SurelyNot.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -171,6 +173,7 @@
 		288651EAFB07EC4F6573121C /* Bills */ = {
 			isa = PBXGroup;
 			children = (
+				F6EB416CB2EDA61AD76880D4 /* BillReminders.swift */,
 				7A8611A4228DF5F247B6D047 /* BillSchedule.swift */,
 				4A97C186A4880D962252D426 /* BillsView.swift */,
 			);
@@ -476,6 +479,7 @@
 				2C56BD7883E3748504DA0948 /* AccountDetailView.swift in Sources */,
 				412199E930B7A2A295098EB7 /* AccountsView.swift in Sources */,
 				104CA452475FA649CE3B213C /* AppLock.swift in Sources */,
+				45497040DCBCCA45226F1337 /* BillReminders.swift in Sources */,
 				8C440361E94BC4B6DA1D068D /* BillSchedule.swift in Sources */,
 				DCD06C8B9E346EA35F131828 /* BillsView.swift in Sources */,
 				2C381A4D0F5DC96E7C22C894 /* BudgetsView.swift in Sources */,

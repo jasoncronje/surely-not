@@ -48,6 +48,7 @@ final class BillsModel {
         }
         if let snapshot = state.value {
             await WidgetFeed.publish(statuses: snapshot.statuses, client: client)
+            await BillReminders.sync(statuses: snapshot.statuses)
         }
     }
 
