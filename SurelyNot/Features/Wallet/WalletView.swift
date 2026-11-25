@@ -126,7 +126,9 @@ struct WalletView: View {
                     Task { await wallet.sync() }
                 }
             }
-            Text("Wallet syncs when you open the app and when you tap Sync now, not while the app is closed.")
+            Text(wallet.isBackgroundSyncOn
+                ? "Background sync is on. Wallet also sends what is new about once an hour while the app is closed."
+                : "Background sync is off. Wallet syncs when you open the app and when you tap Sync now.")
                 .font(Theme.small)
                 .foregroundStyle(Theme.muted)
         }

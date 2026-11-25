@@ -174,14 +174,44 @@ nonisolated struct WalletReviewItem: Identifiable, Sendable, Equatable {
     var id: String { conflict.id }
 }
 
+/// Keeps the app running for a short while after it leaves the screen, so a
+/// sync can finish. iOS ends an app that is suspended while it holds a lock
+/// on a shared file, so when the time runs out the lock is let go first.
+protocol WalletKeepAwake: AnyObject {
+    func begin(onExpiry: @escaping @MainActor () -> Void) -> Int
+    func end(_ id: Int)
+}
+
 /// Runs Apple Wallet sync: sets the connection up, reads what changed in
 /// Wallet, queues it on disk and uploads it to Sure in order.
 ///
 /// Every step can be repeated safely. Batches are written to disk before they
 /// are sent, Sure treats a repeated batch as the same batch, and Wallet is
 /// read from a saved place that only moves on once the batch is on disk.
+///
+/// With background sync, the background extension runs this too, on the
+/// same files. Each side takes a lock before it changes them and reads them
+/// afresh once it has the lock, so the two never work at the same time and
+/// neither works from an old copy.
 @Observable
 final class WalletSync {
+    /// How an action treats the lock shared with the background extension.
+    private enum LockUse {
+        /// Waits a little for the other side to finish.
+        case wait
+        /// Gives up straight away if the other side has it.
+        case skipIfBusy
+        /// Touches nothing on disk, so needs no lock.
+        case none
+    }
+
+    private enum Outcome {
+        case done
+        case failed
+        /// The other side had the lock.
+        case busy
+    }
+
     enum Availability: Equatable {
         case checking
         case ready
@@ -199,6 +229,12 @@ final class WalletSync {
     @ObservationIgnored private let blocked: String?
     @ObservationIgnored private var draft: WalletDraft?
     @ObservationIgnored private var lastAutomaticSync: Date?
+    /// True when this build has background sync, so iOS can be asked to
+    /// wake the extension.
+    @ObservationIgnored private let backgroundBuiltIn: Bool
+    @ObservationIgnored private var askedForBackgroundDelivery = false
+    /// The shared lock, while an action holds it.
+    @ObservationIgnored private var heldLock: WalletLock?
 
     private(set) var availability: Availability = .checking
     private(set) var link: WalletLink?
@@ -219,6 +255,10 @@ final class WalletSync {
     @ObservationIgnored var onImported: (() -> Void)?
     /// How long to wait between checks on whether Sure has imported an upload.
     @ObservationIgnored var settleDelay: Duration = .seconds(2)
+    /// How long a person's own action waits for a background sync to finish.
+    @ObservationIgnored var lockWait: Duration = .seconds(10)
+    /// Keeps the app running while it holds the lock. Nil in the extension.
+    @ObservationIgnored var keepAwake: (any WalletKeepAwake)?
 
     init(
         server: any WalletServer,
@@ -227,7 +267,8 @@ final class WalletSync {
         store: WalletStore,
         secrets: any WalletSecretStore,
         serverKey: String,
-        blocked: String? = nil
+        blocked: String? = nil,
+        backgroundBuiltIn: Bool = false
     ) {
         self.server = server
         self.uploader = uploader
@@ -236,27 +277,33 @@ final class WalletSync {
         self.secrets = secrets
         self.serverKey = serverKey
         self.blocked = blocked
+        self.backgroundBuiltIn = backgroundBuiltIn
         let state = store.load()
         link = state.link
         draft = state.draft
     }
 
+    #if !WALLET_EXTENSION
     convenience init(client: APIClient, signIn: SignInMethod?) {
         self.init(
             server: client,
             uploader: WalletUploader(baseURL: client.baseURL),
             source: FinanceKitSource(),
-            store: WalletStore(serverURL: client.baseURL),
+            store: WalletStore.forApp(serverURL: client.baseURL),
             secrets: WalletKeychain(),
             serverKey: WalletStore.key(for: client.baseURL),
-            blocked: WalletRules.blockReason(serverURL: client.baseURL, signIn: signIn)
+            blocked: WalletRules.blockReason(serverURL: client.baseURL, signIn: signIn),
+            backgroundBuiltIn: WalletBackground.isBuiltIn
         )
     }
+    #endif
 
     private var credentialKey: String { "\(serverKey).credential" }
     private var connectionKey: String { "\(serverKey).connection" }
 
     var isConnected: Bool { link != nil }
+    /// True when iOS has been asked to sync Wallet while the app is closed.
+    var isBackgroundSyncOn: Bool { backgroundBuiltIn && link != nil }
     /// Why uploads are stopped until the connection is repaired, if they are.
     var repairNeeded: String? { link?.repairReason.map(WalletProblem.repair) }
     var openConflicts: Int { connection?.openConflicts ?? 0 }
@@ -271,6 +318,10 @@ final class WalletSync {
     /// Checks that this phone and this server can do Wallet sync, and how the
     /// connection is doing.
     func refresh() async {
+        // The background extension may have synced since this was last read.
+        if !isWorking {
+            reloadFromDisk()
+        }
         if let reason = source.unavailableReason ?? blocked {
             availability = .unavailable(reason)
             return
@@ -283,6 +334,7 @@ final class WalletSync {
             }
             self.capabilities = capabilities
             availability = .ready
+            keepBackgroundDeliveryOn()
         } catch is CancellationError {
             return
         } catch let error as APIError {
@@ -318,24 +370,38 @@ final class WalletSync {
         do {
             let current = try await server.walletConnection(id: connectionID)
             // The link may have moved on while Sure was answering.
-            guard var link, link.connectionId == connectionID else { return }
+            guard let link, link.connectionId == connectionID else { return }
             connection = current
             if current.isRevoked {
-                forgetLink()
+                locked {
+                    guard self.link?.connectionId == connectionID else { return }
+                    self.forgetLink()
+                }
                 problem = WalletProblem.explain(code: "connection_revoked")
                 return
             }
+            let reason: String?
             if current.needsRepair {
-                link.repairReason = current.repairReason ?? "repair_required"
+                reason = current.repairReason ?? "repair_required"
             } else if current.generation != link.generation
                 || current.streamId.map({ $0.lowercased() != link.streamId.lowercased() }) == true {
-                link.repairReason = "stream_changed"
+                reason = "stream_changed"
+            } else {
+                reason = nil
             }
-            self.link = link
-            persist()
+            if let reason {
+                locked {
+                    guard self.link?.connectionId == connectionID else { return }
+                    self.link?.repairReason = reason
+                    self.persist()
+                }
+            }
         } catch let error as APIError where error.status == 404 {
             guard link?.connectionId == connectionID else { return }
-            forgetLink()
+            locked {
+                guard self.link?.connectionId == connectionID else { return }
+                self.forgetLink()
+            }
             problem = "Sure no longer has this Wallet connection. Connect Wallet again to carry on."
         } catch {
             // Not being able to ask is not news. The last answer stands.
@@ -349,7 +415,9 @@ final class WalletSync {
     func walletAccounts() async -> [WalletAccount]? {
         var accounts: [WalletAccount]?
         guard availability == .ready else { return nil }
-        await work("Asking Wallet") {
+        // Apple's sheet can stay up a while, and this saves nothing, so the
+        // background extension is not kept waiting.
+        await work("Asking Wallet", lock: .none) {
             guard try await self.source.requestAuthorization() == .authorized else {
                 throw WalletProblem("This app is not allowed to read Wallet. Allow it in the Settings app, then try again.")
             }
@@ -490,6 +558,32 @@ final class WalletSync {
         self.draft = nil
         connection = nil
         persist()
+        keepBackgroundDeliveryOn()
+    }
+
+    // MARK: - Background sync
+
+    /// Asks iOS, once per launch, to wake the background extension when
+    /// Wallet has something new. Only a build with background sync asks.
+    private func keepBackgroundDeliveryOn() {
+        guard backgroundBuiltIn, link != nil, blocked == nil, !askedForBackgroundDelivery else { return }
+        askedForBackgroundDelivery = true
+        source.setBackgroundDelivery(true)
+    }
+
+    /// The sync the background extension runs. It never asks for Wallet
+    /// access and shows nothing. It uploads with the connection's upload
+    /// key, and leaves anything that needs the person's sign-in, such as a
+    /// new upload key or a repair, to the app.
+    @discardableResult
+    func syncInBackground() async -> Bool {
+        if let reason = source.unavailableReason ?? blocked {
+            availability = .unavailable(reason)
+            return false
+        }
+        availability = .ready
+        reloadFromDisk()
+        return await sync(askingForAccess: false)
     }
 
     // MARK: - Syncing
@@ -511,18 +605,32 @@ final class WalletSync {
     func sync(askingForAccess: Bool = true) async -> Bool {
         guard availability == .ready, let link, link.repairReason == nil else { return false }
         var sent = 0
-        let finished = await work("Reading Wallet") {
+        // A sync never waits: if the other side is syncing, it has it covered.
+        let outcome = await run("Reading Wallet", lock: .skipIfBusy) {
+            // What is on disk now may differ from what was here a moment ago.
+            guard let current = self.link else {
+                throw WalletProblem(WalletProblem.explain(code: "connection_revoked") ?? "")
+            }
+            if let reason = current.repairReason {
+                throw WalletProblem(WalletProblem.repair(reason))
+            }
             try await self.capture(askingForAccess: askingForAccess)
             sent = try await self.upload()
             await self.settle(sent: sent)
+            self.link?.lastSyncedAt = .now
+            try self.save()
         }
-        guard finished else {
+        switch outcome {
+        case .busy:
+            lastOutcome = "Wallet is already syncing in the background."
+            return false
+        case .failed:
             // What the sync before this one did is no longer the news.
             lastOutcome = nil
             return false
+        case .done:
+            break
         }
-        self.link?.lastSyncedAt = .now
-        persist()
         lastOutcome = sent == 0 ? "Nothing new in Wallet."
             : "Sent \(sent) \(sent == 1 ? "record" : "records") to Sure."
         if sent > 0 {
@@ -625,10 +733,13 @@ final class WalletSync {
             case .accepted(let receipt):
                 link.outbox.removeFirst()
                 link.lastUploadedSequence = batch.sequence
-                store.removePayload(for: batch)
                 sent += batch.recordCount
                 self.link = link
-                persist()
+                // Saved before the file goes. Stopped in between, the file
+                // is left over, which is harmless; the other way round the
+                // state would list a batch with nothing to send.
+                try save()
+                store.removePayload(for: batch)
                 if receipt.wasDropped {
                     try stop(&link, reason: receipt.errorCode ?? "batch_\(receipt.status)")
                 }
@@ -654,6 +765,7 @@ final class WalletSync {
                 try stop(&link, reason: code ?? "upload_refused_\(status)")
             }
         }
+        store.pruneOutbox(keeping: link.outbox)
         return sent
     }
 
@@ -766,12 +878,18 @@ final class WalletSync {
         }
     }
 
+    /// Called with the lock held.
     private func forgetLink() {
         store.clearOutbox()
         secrets.write(nil, for: credentialKey)
         link = nil
         connection = nil
         persist()
+        // Nothing left to sync, so iOS need not wake the extension.
+        if backgroundBuiltIn {
+            source.setBackgroundDelivery(false)
+            askedForBackgroundDelivery = false
+        }
     }
 
     // MARK: - Records Sure wants looked at
@@ -792,7 +910,7 @@ final class WalletSync {
     @discardableResult
     func resolve(_ conflicts: [WalletConflict], keepingSure: Bool) async -> Bool {
         guard let connectionID = link?.connectionId else { return false }
-        let done = await work("Saving your choice") {
+        let done = await work("Saving your choice", lock: .none) {
             for conflict in conflicts {
                 try await self.server.walletResolve(
                     connectionID: connectionID,
@@ -809,8 +927,12 @@ final class WalletSync {
 
     /// Runs one action at a time and turns a failure into `problem`.
     @discardableResult
-    private func work(_ label: String, _ body: () async throws -> Void) async -> Bool {
-        guard !isWorking else { return false }
+    private func work(_ label: String, lock: LockUse = .wait, _ body: () async throws -> Void) async -> Bool {
+        await run(label, lock: lock, body) == .done
+    }
+
+    private func run(_ label: String, lock use: LockUse, _ body: () async throws -> Void) async -> Outcome {
+        guard !isWorking else { return .failed }
         isWorking = true
         activity = label
         problem = nil
@@ -818,18 +940,76 @@ final class WalletSync {
             isWorking = false
             activity = nil
         }
+
+        if use != .none {
+            let wait: Duration = use == .wait ? lockWait : .zero
+            guard let lock = await WalletLock.take(store.lockFile, waitingUpTo: wait) else {
+                if use == .wait {
+                    problem = "Wallet is syncing in the background. Try again in a moment."
+                }
+                return .busy
+            }
+            heldLock = lock
+            // Should iOS end the app's time before this is done, the lock is
+            // let go and nothing more is saved; the next sync starts afresh.
+            let awake = keepAwake?.begin { [weak self] in
+                self?.heldLock?.release()
+            }
+            reloadFromDisk()
+            defer {
+                lock.release()
+                heldLock = nil
+                if let awake {
+                    keepAwake?.end(awake)
+                }
+            }
+            return await attempt(body)
+        }
+        return await attempt(body)
+    }
+
+    private func attempt(_ body: () async throws -> Void) async -> Outcome {
         do {
             try await body()
-            return true
+            return .done
         } catch is CancellationError {
-            return false
+            return .failed
         } catch {
             problem = WalletProblem.explain(error)
-            return false
+            return .failed
         }
     }
 
+    /// Runs `body` holding the lock: straight away inside an action that
+    /// already holds it, otherwise only if the other side does not have it,
+    /// starting from what is on disk. Skipped when it is busy; whatever
+    /// `body` would have saved is worked out again next time.
+    private func locked(_ body: () -> Void) {
+        if heldLock?.isHeld == true {
+            body()
+            return
+        }
+        guard heldLock == nil, let lock = WalletLock.take(store.lockFile) else { return }
+        heldLock = lock
+        defer {
+            lock.release()
+            heldLock = nil
+        }
+        reloadFromDisk()
+        body()
+    }
+
+    /// Picks up what is on disk, which the other side may have changed.
+    private func reloadFromDisk() {
+        let state = store.load()
+        link = state.link
+        draft = state.draft
+    }
+
+    /// Only ever saves while holding the lock. Without it the other side may
+    /// be writing, and an old copy must never overwrite a newer one.
     private func save() throws {
+        guard heldLock?.isHeld == true else { throw CancellationError() }
         try store.save(WalletState(link: link, draft: draft))
     }
 

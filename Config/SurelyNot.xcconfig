@@ -2,20 +2,51 @@
 
 // Apple Wallet sync reads Wallet through FinanceKit. Apple only lets an app do
 // that if it has the FinanceKit entitlement, which Apple grants to a developer
-// team on request. A build signed with the entitlement before Apple has
-// granted it will not install on a phone, so it is off unless you turn it on.
+// team on request, per App ID. A build signed with the entitlement before
+// Apple has granted it will not install on a phone, so both switches below
+// are off unless you turn them on.
 //
-// To turn it on, once Apple has granted your team the entitlement, create
-// Config/Local.xcconfig (it is ignored by git) with these two lines:
+// To turn them on, create Config/Local.xcconfig (it is ignored by git):
 //
 //   WALLET_SYNC_ENABLED = YES
-//   CODE_SIGN_ENTITLEMENTS = SurelyNot/Wallet.entitlements
+//     Wallet sync while the app is open. Needs FinanceKit granted for the
+//     app, io.cronje.surelynot.
 //
-// See "Apple Wallet" in README.md.
+//   WALLET_BACKGROUND_ENABLED = YES
+//     Background sync, while the app is closed. Also needs FinanceKit
+//     granted for the extension, io.cronje.surelynot.walletsync, and the
+//     App Group below on both App IDs. Does nothing without the line above.
+//
+// The entitlements follow from the switches, so Local.xcconfig needs no
+// CODE_SIGN_ENTITLEMENTS line (an old one is overridden below). See
+// "Apple Wallet" in README.md.
 WALLET_SYNC_ENABLED = NO
+WALLET_BACKGROUND_ENABLED = NO
 
-// The app's entitlements: the keychain group it shares with its home screen
-// widget. Wallet.entitlements carries the same group plus FinanceKit.
-CODE_SIGN_ENTITLEMENTS = SurelyNot/SurelyNot.entitlements
+// The folder the app and the extension share for Wallet state. Only used,
+// and only in the entitlements, when background sync is on.
+WALLET_APP_GROUP = group.io.cronje.surelynot
+// The app's own keychain group, where the sign-in and the Wallet upload key
+// are kept. The extension reads them from there.
+WALLET_APP_BUNDLE_ID = io.cronje.surelynot
 
 #include? "Local.xcconfig"
+
+// Background sync only counts with Wallet sync on.
+WALLET_BACKGROUND_ACTIVE_NO_NO = NO
+WALLET_BACKGROUND_ACTIVE_NO_YES = NO
+WALLET_BACKGROUND_ACTIVE_YES_NO = NO
+WALLET_BACKGROUND_ACTIVE_YES_YES = YES
+WALLET_BACKGROUND_ACTIVE = $(WALLET_BACKGROUND_ACTIVE_$(WALLET_SYNC_ENABLED)_$(WALLET_BACKGROUND_ENABLED))
+
+// The app's entitlements, from the switches:
+// - SurelyNot.entitlements: the keychain group it shares with its home
+//   screen widget. Nothing else.
+// - Wallet.entitlements: the same group plus FinanceKit.
+// - WalletBackground.entitlements: those plus the App Group shared with the
+//   background extension.
+APP_ENTITLEMENTS_NO_NO = SurelyNot/SurelyNot.entitlements
+APP_ENTITLEMENTS_NO_YES = SurelyNot/SurelyNot.entitlements
+APP_ENTITLEMENTS_YES_NO = SurelyNot/Wallet.entitlements
+APP_ENTITLEMENTS_YES_YES = SurelyNot/WalletBackground.entitlements
+CODE_SIGN_ENTITLEMENTS = $(APP_ENTITLEMENTS_$(WALLET_SYNC_ENABLED)_$(WALLET_BACKGROUND_ENABLED))

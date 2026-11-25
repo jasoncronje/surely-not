@@ -82,6 +82,7 @@ private nonisolated final class DemoSource: WalletSource, @unchecked Sendable {
 
     func balances() async throws -> [WalletBalance] { [] }
     func transactions(ids: Set<String>) async throws -> [WalletTransaction] { [] }
+    func setBackgroundDelivery(_ isOn: Bool) {}
     func transactionChanges(accountId: String, since token: Data?) async throws -> WalletTransactionChanges {
         WalletTransactionChanges(token: Data("demo".utf8))
     }

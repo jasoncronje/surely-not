@@ -94,6 +94,8 @@ nonisolated protocol WalletSource: Sendable {
     func transactionChanges(accountId: String, since token: Data?) async throws -> WalletTransactionChanges
     /// The transactions with these IDs that Wallet still holds.
     func transactions(ids: Set<String>) async throws -> [WalletTransaction]
+    /// Turns iOS waking the background extension on or off.
+    func setBackgroundDelivery(_ isOn: Bool)
 }
 
 /// One reading of Wallet, taken in a single go.

@@ -49,6 +49,10 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
+	<key>WalletAppGroup</key>
+	<string>$(WALLET_APP_GROUP)</string>
+	<key>WalletBackgroundEnabled</key>
+	<string>$(WALLET_BACKGROUND_ACTIVE)</string>
 	<key>WalletSyncEnabled</key>
 	<string>$(WALLET_SYNC_ENABLED)</string>
 	<key>WidgetKeychainGroup</key>

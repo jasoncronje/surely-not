@@ -21,6 +21,10 @@ targets:
     sources: [SurelyNot, Shared]
     dependencies:
       - target: SurelyNotWidgets
+      # Built every time, embedded only with background sync on: see the
+      # script below and Config/WalletSync.xcconfig.
+      - target: SurelyNotWalletSync
+        embed: false
     configFiles:
       Debug: Config/SurelyNot.xcconfig
       Release: Config/SurelyNot.xcconfig
@@ -39,6 +43,8 @@ targets:
           NSAllowsLocalNetworking: true
         NSFinancialDataUsageDescription: Surely Not sends the Wallet accounts you choose, with their balances and transactions, to your own Sure server.
         WalletSyncEnabled: $(WALLET_SYNC_ENABLED)
+        WalletBackgroundEnabled: $(WALLET_BACKGROUND_ACTIVE)
+        WalletAppGroup: $(WALLET_APP_GROUP)
         WidgetKeychainGroup: $(AppIdentifierPrefix)$(WIDGET_KEYCHAIN_GROUP)
         UIBackgroundModes: [fetch]
         BGTaskSchedulerPermittedIdentifiers: [io.cronje.surelynot.refresh]
@@ -48,6 +54,22 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         TARGETED_DEVICE_FAMILY: "1"
+    postBuildScripts:
+      # The Wallet background sync extension goes into the app only when
+      # background sync is on. Off, the app is exactly what it was before:
+      # no extension, and nothing signed with FinanceKit but the app itself.
+      - name: Embed Wallet background sync
+        basedOnDependencyAnalysis: false
+        script: |
+          set -e
+          embedded="${TARGET_BUILD_DIR}/${EXTENSIONS_FOLDER_PATH}/SurelyNotWalletSync.appex"
+          rm -rf "${embedded}"
+          if [ "${WALLET_BACKGROUND_ACTIVE}" = "YES" ]; then
+            mkdir -p "${TARGET_BUILD_DIR}/${EXTENSIONS_FOLDER_PATH}"
+            ditto "${BUILT_PRODUCTS_DIR}/SurelyNotWalletSync.appex" "${embedded}"
+          else
+            rmdir "${TARGET_BUILD_DIR}/${EXTENSIONS_FOLDER_PATH}" 2>/dev/null || true
+          fi
     scheme:
       testTargets: [SurelyNotTests]
   SurelyNotWidgets:
@@ -69,6 +91,46 @@ targets:
         CODE_SIGN_ENTITLEMENTS: SurelyNotWidgets/Widgets.entitlements
         TARGETED_DEVICE_FAMILY: "1"
         SKIP_INSTALL: YES
+  SurelyNotWalletSync:
+    type: extensionkit-extension
+    platform: iOS
+    # The extension runs the app's own Wallet sync, so it builds the files
+    # that sync needs, and nothing with a screen.
+    sources:
+      - SurelyNotWalletSync
+      - SurelyNot/API/APIError.swift
+      - SurelyNot/API/Models.swift
+      - SurelyNot/Auth/SavedSession.swift
+      - SurelyNot/Wallet/FinanceKitSource.swift
+      - SurelyNot/Wallet/WalletBackgroundSync.swift
+      - SurelyNot/Wallet/WalletServer.swift
+      - SurelyNot/Wallet/WalletShared.swift
+      - SurelyNot/Wallet/WalletSource.swift
+      - SurelyNot/Wallet/WalletStore.swift
+      - SurelyNot/Wallet/WalletSync.swift
+      - SurelyNot/Wallet/WalletWire.swift
+    configFiles:
+      Debug: Config/WalletSync.xcconfig
+      Release: Config/WalletSync.xcconfig
+    info:
+      path: SurelyNotWalletSync/Info.plist
+      properties:
+        CFBundleDisplayName: Surely Not Wallet sync
+        CFBundlePackageType: XPC!
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        WalletSyncEnabled: $(WALLET_SYNC_ENABLED)
+        WalletBackgroundEnabled: $(WALLET_BACKGROUND_ACTIVE)
+        WalletAppGroup: $(WALLET_APP_GROUP)
+        EXAppExtensionAttributes:
+          EXExtensionPointIdentifier: com.apple.financekit.background-delivery
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.cronje.surelynot.walletsync
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) WALLET_EXTENSION
   SurelyNotTests:
     type: bundle.unit-test
     platform: iOS

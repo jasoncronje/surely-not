@@ -1,0 +1,16 @@
+// Build settings for the Wallet background sync extension.
+//
+// The same switches as the app (see SurelyNot.xcconfig). With background
+// sync off the extension is still compiled, so the code stays honest, but it
+// is not signed, so it needs nothing from Apple, and the app does not embed
+// it (see the "Embed Wallet background sync" phase in project.yml).
+
+#include "SurelyNot.xcconfig"
+
+WALLET_SYNC_SIGNING_NO = NO
+WALLET_SYNC_SIGNING_YES = YES
+CODE_SIGNING_ALLOWED = $(WALLET_SYNC_SIGNING_$(WALLET_BACKGROUND_ACTIVE))
+
+WALLET_SYNC_ENTITLEMENTS_NO =
+WALLET_SYNC_ENTITLEMENTS_YES = SurelyNotWalletSync/WalletSync.entitlements
+CODE_SIGN_ENTITLEMENTS = $(WALLET_SYNC_ENTITLEMENTS_$(WALLET_BACKGROUND_ACTIVE))

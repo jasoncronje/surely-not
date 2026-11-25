@@ -9,11 +9,7 @@ import Foundation
 nonisolated struct FinanceKitSource: WalletSource {
     /// True when this copy of the app was built with the FinanceKit entitlement.
     static var isBuiltWithPermission: Bool {
-        switch Bundle.main.object(forInfoDictionaryKey: "WalletSyncEnabled") {
-        case let flag as Bool: flag
-        case let text as String: ["yes", "true", "1"].contains(text.lowercased())
-        default: false
-        }
+        WalletBackground.flag("WalletSyncEnabled")
     }
 
     var unavailableReason: String? {
@@ -126,6 +122,21 @@ nonisolated struct FinanceKitSource: WalletSource {
         return try await FinanceStore.shared.transactions(query: TransactionQuery())
             .filter { ids.contains(WalletWire.id($0.id)) }
             .map(Self.transaction)
+    }
+
+    /// Asks iOS to wake the background extension when Wallet changes, about
+    /// once an hour at most, or to stop. A build without background sync
+    /// never asks: there is no extension for iOS to wake.
+    func setBackgroundDelivery(_ isOn: Bool) {
+        guard WalletBackground.isBuiltIn else { return }
+        if isOn {
+            FinanceStore.shared.enableBackgroundDelivery(
+                for: [.accounts, .accountBalances, .transactions],
+                frequency: .hourly
+            )
+        } else {
+            FinanceStore.shared.disableAllBackgroundDelivery()
+        }
     }
 
     // MARK: - From FinanceKit's shapes to the app's

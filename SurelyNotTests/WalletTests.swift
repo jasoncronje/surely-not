@@ -6,7 +6,7 @@ import Testing
 // checks every record against (app/models/financekit/payload.rb in Sure),
 // because Sure refuses a whole batch over one missing or unexpected key.
 
-private func object(_ data: Data) throws -> [String: Any] {
+func object(_ data: Data) throws -> [String: Any] {
     try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
 }
 
@@ -14,11 +14,11 @@ private func encoded(_ value: some Encodable) throws -> [String: Any] {
     try object(try WalletWire.encoder.encode(value))
 }
 
-private nonisolated let cardID = "11111111-1111-4111-8111-111111111111"
-private nonisolated let cashID = "22222222-2222-4222-8222-222222222222"
-private nonisolated let noon = Date(timeIntervalSince1970: 1_790_000_000)
+nonisolated let cardID = "11111111-1111-4111-8111-111111111111"
+nonisolated let cashID = "22222222-2222-4222-8222-222222222222"
+nonisolated let noon = Date(timeIntervalSince1970: 1_790_000_000)
 
-private nonisolated func linked(_ id: String = cardID, currency: String = "USD", isLiability: Bool = true) -> WalletLinkedAccount {
+nonisolated func linked(_ id: String = cardID, currency: String = "USD", isLiability: Bool = true) -> WalletLinkedAccount {
     WalletLinkedAccount(
         sourceId: id,
         lineageId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -29,7 +29,7 @@ private nonisolated func linked(_ id: String = cardID, currency: String = "USD",
     )
 }
 
-private nonisolated func card(_ id: String = cardID, name: String = "Apple Card") -> WalletAccount {
+nonisolated func card(_ id: String = cardID, name: String = "Apple Card") -> WalletAccount {
     WalletAccount(
         id: id,
         displayName: name,
@@ -41,7 +41,7 @@ private nonisolated func card(_ id: String = cardID, name: String = "Apple Card"
     )
 }
 
-private nonisolated func purchase(
+nonisolated func purchase(
     _ id: String,
     amount: Decimal = 12.34,
     at date: Date = noon.addingTimeInterval(-3600),
@@ -539,15 +539,23 @@ private nonisolated func balance(_ amount: Decimal, at date: Date = noon.addingT
 
 // MARK: - The engine, against a pretend Wallet and a pretend Sure
 
-private nonisolated final class FakeSource: WalletSource, @unchecked Sendable {
+nonisolated final class FakeSource: WalletSource, @unchecked Sendable {
     var accountList = [card()]
     var balanceList = [balance(250)]
     var changes = WalletTransactionChanges(upserts: [purchase("t1"), purchase("t2")], token: Data("one".utf8))
     var tokensAsked: [Data?] = []
+    var access = WalletAuthorization.authorized
+    var accessRequests = 0
+    /// Each time iOS was asked to wake, or stop waking, the extension.
+    var backgroundDelivery: [Bool] = []
 
     var unavailableReason: String? { nil }
-    func authorization() async throws -> WalletAuthorization { .authorized }
-    func requestAuthorization() async throws -> WalletAuthorization { .authorized }
+    func authorization() async throws -> WalletAuthorization { access }
+    func requestAuthorization() async throws -> WalletAuthorization {
+        accessRequests += 1
+        return .authorized
+    }
+    func setBackgroundDelivery(_ isOn: Bool) { backgroundDelivery.append(isOn) }
     func accounts() async throws -> [WalletAccount] { accountList }
     func balances() async throws -> [WalletBalance] { balanceList }
     func transactions(ids: Set<String>) async throws -> [WalletTransaction] { [] }
@@ -558,7 +566,7 @@ private nonisolated final class FakeSource: WalletSource, @unchecked Sendable {
     }
 }
 
-private nonisolated final class FakeUploader: WalletUploading, @unchecked Sendable {
+nonisolated final class FakeUploader: WalletUploading, @unchecked Sendable {
     nonisolated struct Sent {
         let payload: Data
         let batch: WalletQueuedBatch
@@ -568,21 +576,24 @@ private nonisolated final class FakeUploader: WalletUploading, @unchecked Sendab
     var sent: [Sent] = []
     /// Answers to give before going back to accepting everything.
     var script: [WalletUploadResult] = []
+    /// Runs while a batch is on its way, before Sure answers.
+    var whileSending: (@Sendable () async -> Void)?
 
     func upload(_ payload: Data, batch: WalletQueuedBatch, publisherId: String, credential: String) async -> WalletUploadResult {
         sent.append(Sent(payload: payload, batch: batch, credential: credential))
+        await whileSending?()
         if !script.isEmpty { return script.removeFirst() }
         return .accepted(WalletReceipt(batchId: batch.batchId, sequence: batch.sequence, status: "accepted", errorCode: nil))
     }
 }
 
-private nonisolated final class FakeSecrets: WalletSecretStore, @unchecked Sendable {
+nonisolated final class FakeSecrets: WalletSecretStore, @unchecked Sendable {
     var values: [String: String] = [:]
     func read(_ key: String) -> String? { values[key] }
     func write(_ value: String?, for key: String) { values[key] = value }
 }
 
-private final class FakeServer: WalletServer {
+final class FakeServer: WalletServer {
     var enrollments: [WalletEnrollment] = []
     var mapped: [String: WalletMappingRequest] = [:]
     var status = "pending_mapping"

@@ -87,6 +87,7 @@ struct MainTabView: View {
         let wallet = WalletSync(client: client, signIn: signIn)
         // New Wallet data changes balances and lists across the app.
         wallet.onImported = { changes.noteChange() }
+        wallet.keepAwake = AppKeepAwake()
         _wallet = State(initialValue: wallet)
         _bills = State(initialValue: BillsModel(client: client))
     }
@@ -121,8 +122,9 @@ struct MainTabView: View {
         .environment(categoryChanger)
         .environment(wallet)
         .task { await categoryChanger.loadIfNeeded() }
-        // Wallet can only be read while the app is open, so each time the
-        // app comes to the front it sends what is new.
+        // Each time the app comes to the front it sends what is new in
+        // Wallet. With background sync built in, the extension also does
+        // while the app is closed.
         .task { await wallet.syncIfDue() }
         .task { await bills.load() }
         .onChange(of: scenePhase) {

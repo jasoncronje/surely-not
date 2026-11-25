@@ -70,6 +70,17 @@ nonisolated struct WalletState: Codable, Sendable, Equatable {
 /// Keeps the Wallet connection's state and its waiting batches on disk, one
 /// folder per Sure server.
 nonisolated struct WalletStore: Sendable {
+    static let stateName = "state.json"
+    static let lockName = ".lock"
+
+    /// Where builds without background sync keep Wallet state: inside the
+    /// app, out of the extension's reach.
+    static var appRoot: URL {
+        URL.applicationSupportDirectory.appending(path: "Wallet", directoryHint: .isDirectory)
+    }
+
+    /// The folder that holds every server's folder, and the lock.
+    let root: URL
     let directory: URL
 
     /// A short, file-safe name for one server.
@@ -78,12 +89,32 @@ nonisolated struct WalletStore: Sendable {
     }
 
     init(serverURL: URL, root: URL? = nil) {
-        let base = root ?? URL.applicationSupportDirectory.appending(path: "Wallet", directoryHint: .isDirectory)
+        let base = root ?? Self.appRoot
+        self.root = base
         directory = base.appending(path: Self.key(for: serverURL), directoryHint: .isDirectory)
     }
 
-    private var stateFile: URL { directory.appending(path: "state.json") }
+    /// The store the app uses for this server. With background sync built
+    /// in, that is the folder shared with the extension, and state an older
+    /// build left in the app's own folder is moved there first. Until the
+    /// move has gone through, the app carries on from its own folder.
+    static func forApp(
+        serverURL: URL,
+        sharedRoot: URL? = WalletBackground.sharedRoot,
+        appRoot: URL = appRoot
+    ) -> WalletStore {
+        guard let sharedRoot else { return WalletStore(serverURL: serverURL, root: appRoot) }
+        switch WalletMigration.move(serverKey: key(for: serverURL), from: appRoot, to: sharedRoot) {
+        case .nothingToMove, .moved, .keptShared:
+            return WalletStore(serverURL: serverURL, root: sharedRoot)
+        case .busy, .failed:
+            return WalletStore(serverURL: serverURL, root: appRoot)
+        }
+    }
+
+    private var stateFile: URL { directory.appending(path: Self.stateName) }
     private var outbox: URL { directory.appending(path: "outbox", directoryHint: .isDirectory) }
+    var lockFile: URL { root.appending(path: Self.lockName) }
 
     func load() -> WalletState {
         guard let data = try? Data(contentsOf: stateFile),
@@ -93,12 +124,12 @@ nonisolated struct WalletStore: Sendable {
 
     func save(_ state: WalletState) throws {
         try prepare()
-        try write(try JSONEncoder().encode(state), to: stateFile)
+        try Self.write(try JSONEncoder().encode(state), to: stateFile)
     }
 
     func writePayload(_ payload: Data, for batch: WalletQueuedBatch) throws {
         try prepare()
-        try write(payload, to: outbox.appending(path: batch.fileName))
+        try Self.write(payload, to: outbox.appending(path: batch.fileName))
     }
 
     func payload(for batch: WalletQueuedBatch) -> Data? {
@@ -107,6 +138,16 @@ nonisolated struct WalletStore: Sendable {
 
     func removePayload(for batch: WalletQueuedBatch) {
         try? FileManager.default.removeItem(at: outbox.appending(path: batch.fileName))
+    }
+
+    /// Removes batch files the state no longer lists, such as one whose
+    /// upload went through just before the process was stopped.
+    func pruneOutbox(keeping batches: [WalletQueuedBatch]) {
+        let kept = Set(batches.map(\.fileName))
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: outbox.path(percentEncoded: false))) ?? []
+        for name in names where !kept.contains(name) {
+            try? FileManager.default.removeItem(at: outbox.appending(path: name))
+        }
     }
 
     func clearOutbox() {
@@ -120,17 +161,22 @@ nonisolated struct WalletStore: Sendable {
 
     private func prepare() throws {
         try FileManager.default.createDirectory(at: outbox, withIntermediateDirectories: true)
-        // Waiting batches hold transactions. They are sent to Sure, not to
-        // a device backup.
-        var folder = directory
+        Self.keepOutOfBackups(directory)
+    }
+
+    /// Waiting batches hold transactions. They are sent to Sure, not to a
+    /// device backup.
+    static func keepOutOfBackups(_ folder: URL) {
+        var folder = folder
         var values = URLResourceValues()
         values.isExcludedFromBackup = true
         try? folder.setResourceValues(values)
     }
 
     /// Written whole or not at all, and locked while the phone is locked
-    /// until it has been unlocked once after starting up.
-    private func write(_ data: Data, to file: URL) throws {
+    /// until it has been unlocked once after starting up. The background
+    /// extension only runs after that first unlock.
+    static func write(_ data: Data, to file: URL) throws {
         try data.write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     }
 }
@@ -145,6 +191,10 @@ nonisolated protocol WalletSecretStore: Sendable {
 /// Keeps Wallet secrets in the iOS Keychain. The Keychain outlives the app
 /// being deleted, which is how a reinstalled app can take over the
 /// connection it had before.
+///
+/// The background extension reads the same items where they already are:
+/// its entitlements list the app's own keychain group, so nothing is moved,
+/// and the widget, which shares a different group, never sees them.
 nonisolated struct WalletKeychain: WalletSecretStore {
     private static let service = "io.cronje.surelynot.wallet"
 

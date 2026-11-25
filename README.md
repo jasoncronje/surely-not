@@ -64,22 +64,46 @@ To turn it on once Apple has granted the entitlement, create `Config/Local.xccon
 
 ```
 WALLET_SYNC_ENABLED = YES
-CODE_SIGN_ENTITLEMENTS = SurelyNot/Wallet.entitlements
 ```
 
-Without that file the app builds and runs as before, and the Apple Wallet screen says the build has no permission.
+The entitlements follow from that line, so no `CODE_SIGN_ENTITLEMENTS` line is needed (an older one is ignored). Without the file the app builds and runs as before, and the Apple Wallet screen says the build has no permission.
+
+#### Background sync
+
+The app can also sync Wallet while it is closed. iOS 26 wakes a small extension in the app, `SurelyNotWalletSync`, when Wallet has something new, at most about once an hour, and the extension sends it to Sure the same way the app does. It is off until you turn it on, because it needs a second grant from Apple:
+
+- **FinanceKit for the extension.** The extension has its own App ID, `io.cronje.surelynot.walletsync`, and Apple grants FinanceKit per App ID. Ask for it the same way as for the app, then tick FinanceKit on that App ID too. Until then leave background sync off: a build that embeds the extension signed with FinanceKit will not install.
+- **The App Group `group.io.cronje.surelynot`** on both App IDs, so the app and the extension share the Wallet state. Register it under Identifiers and add it to both App IDs, or let Xcode's automatic signing do that the first time it signs a build with background sync on.
+
+Then add a second line to `Config/Local.xcconfig`:
+
+```
+WALLET_SYNC_ENABLED = YES
+WALLET_BACKGROUND_ENABLED = YES
+```
+
+With it off, the build is the same as before: the extension is compiled but not signed and not put in the app, the app's entitlements do not change, and the app never asks iOS for background delivery. The Wallet screen says "Background sync is off".
+
+With it on:
+
+- Once Wallet is connected, the app asks iOS to wake the extension for new accounts, balances and transactions, hourly at most. Disconnecting asks iOS to stop.
+- The first launch moves the Wallet state (the connection, where each account's history was read up to, and any uploads still waiting) from the app's own folder into the shared one. It copies, checks the copy byte for byte, puts it in place in one step, then removes the original, so the live connection carries on where it was. If the move cannot finish, the app keeps using its own folder and tries again next launch.
+- The app and the extension take a shared lock before touching the Wallet state, and read it afresh once they have it, so they never read Wallet or upload at the same time. A sync that finds the lock taken skips quietly; the other side has it covered.
+- The extension holds to the same rules as the app: nothing is sent unless someone is signed in, with a second step, to a server on `https://`. It never asks for Wallet access and shows nothing.
+- The extension uploads with the connection's upload key only, and never uses your sign-in, so it cannot sign you out by refreshing a token at the same moment as the app. Anything that needs the sign-in, such as a new upload key or a repair, waits for the app to open.
+- The sign-in and the upload key stay where they are in the Keychain. The extension reads them from the app's own keychain group; the widget, which shares a different group, never sees them.
 
 How it behaves:
 
 - You pick the Wallet accounts in Apple's own sheet, then choose for each one whether Sure makes a new account or it goes into an existing account of the same kind and currency.
-- It syncs when you open the app and when you tap Sync now. It does not sync while the app is closed.
+- It syncs when you open the app and when you tap Sync now, and with background sync on, while the app is closed.
 - The first sync sends everything Wallet has, or only recent or new activity if you choose that. After that it sends only what changed, including transactions Wallet removed.
 - Uploads are written to disk first and sent in order, so a lost connection loses nothing and nothing is sent twice.
 - Sure does not overwrite a transaction you edited in Sure. It holds the change back and the app lists it under "needs a look".
 - If Sure and the phone fall out of step, the app says so and offers a repair, which sends Wallet again in full. Sure matches what it already has.
 - Disconnecting keeps what was imported, or removes it if you ask.
 
-The code is in `SurelyNot/Wallet`. `FinanceKitSource.swift` is the only file that touches FinanceKit; the rest is tested against a pretend Wallet and a pretend Sure in `SurelyNotTests/WalletTests.swift`.
+The code is in `SurelyNot/Wallet`, and the extension's entry point in `SurelyNotWalletSync`. `FinanceKitSource.swift` and the extension's `WalletSyncExtension.swift` are the only files that touch FinanceKit; the rest is tested against a pretend Wallet and a pretend Sure in `SurelyNotTests/WalletTests.swift` and `SurelyNotTests/WalletBackgroundTests.swift`.
 
 ### Design
 

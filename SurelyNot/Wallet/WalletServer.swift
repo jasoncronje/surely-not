@@ -20,6 +20,8 @@ protocol WalletServer: AnyObject {
     func walletResolve(connectionID: String, conflictID: String, keepSure: Bool) async throws
 }
 
+// The extension builds without APIClient: it never uses the sign-in.
+#if !WALLET_EXTENSION
 extension APIClient: WalletServer {
     func walletCapabilities() async throws -> WalletCapabilities {
         try await get("financekit/capabilities")
@@ -85,6 +87,7 @@ extension APIClient: WalletServer {
         )
     }
 }
+#endif
 
 /// A connection together with the accounts it feeds.
 nonisolated struct WalletConnectionDetail: Decodable, Sendable {
