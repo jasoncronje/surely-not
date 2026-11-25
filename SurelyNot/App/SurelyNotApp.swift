@@ -36,12 +36,18 @@ struct MainTabView: View {
     let client: APIClient
     @State private var changes: LedgerChanges
     @State private var categoryChanger: CategoryChanger
+    @State private var wallet: WalletSync
+    @Environment(\.scenePhase) private var scenePhase
 
     init(client: APIClient) {
         self.client = client
         let changes = LedgerChanges()
         _changes = State(initialValue: changes)
         _categoryChanger = State(initialValue: CategoryChanger(client: client, changes: changes))
+        let wallet = WalletSync(client: client)
+        // New Wallet data changes balances and lists across the app.
+        wallet.onImported = { changes.noteChange() }
+        _wallet = State(initialValue: wallet)
     }
 
     var body: some View {
@@ -69,7 +75,16 @@ struct MainTabView: View {
         .tabBarMinimizeBehavior(.onScrollDown)
         .environment(changes)
         .environment(categoryChanger)
+        .environment(wallet)
         .task { await categoryChanger.loadIfNeeded() }
+        // Wallet can only be read while the app is open, so each time the
+        // app comes to the front it sends what is new.
+        .task { await wallet.syncIfDue() }
+        .onChange(of: scenePhase) {
+            if scenePhase == .active {
+                Task { await wallet.syncIfDue() }
+            }
+        }
         .alert(
             "That did not work",
             isPresented: Binding(

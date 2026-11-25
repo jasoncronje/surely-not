@@ -47,6 +47,7 @@ fastlane/test_output
 .env.*
 !.env.example
 *.xcconfig.local
+Config/Local.xcconfig
 Secrets.xcconfig
 *.p8
 *.p12

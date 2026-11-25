@@ -111,6 +111,7 @@ final class AccountsModel {
 
 struct AccountsView: View {
     private let client: APIClient
+    @Environment(LedgerChanges.self) private var changes
     @State private var model: AccountsModel
 
     init(client: APIClient) {
@@ -127,7 +128,7 @@ struct AccountsView: View {
                     LoadableView(state: model.summary, placeholderLines: 6, retry: model.load) { summary in
                         if summary.groups.isEmpty {
                             Card {
-                                EmptyNote(text: "No accounts yet. Add them in Sure on the web. This app can show accounts but not add them.")
+                                EmptyNote(text: "No accounts yet. Add them in Sure on the web, or connect Apple Wallet below.")
                             }
                         }
                         if summary.assets != nil || summary.debts != nil {
@@ -143,6 +144,13 @@ struct AccountsView: View {
                             groupCard(group)
                         }
                     }
+                    NavigationLink {
+                        WalletView(client: client)
+                    } label: {
+                        WalletEntryRow()
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 8)
                 }
                 .padding(.horizontal, Theme.margin)
                 .padding(.bottom, 24)
@@ -154,6 +162,9 @@ struct AccountsView: View {
             }
             .refreshable { await model.load() }
             .onAppear {
+                Task { await model.load() }
+            }
+            .onChange(of: changes.version) {
                 Task { await model.load() }
             }
         }

@@ -16,6 +16,9 @@ targets:
     type: application
     platform: iOS
     sources: [SurelyNot]
+    configFiles:
+      Debug: Config/SurelyNot.xcconfig
+      Release: Config/SurelyNot.xcconfig
     info:
       path: SurelyNot/Info.plist
       properties:
@@ -29,6 +32,8 @@ targets:
         NSFaceIDUsageDescription: Surely Not uses Face ID to keep your finances private when the lock is on.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+        NSFinancialDataUsageDescription: Surely Not sends the Wallet accounts you choose, with their balances and transactions, to your own Sure server.
+        WalletSyncEnabled: $(WALLET_SYNC_ENABLED)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.cronje.surelynot

@@ -14,6 +14,8 @@ nonisolated struct APIError: LocalizedError, Sendable {
     let message: String
     /// The server wants a two-factor code before it will sign this person in.
     var needsTwoFactor = false
+    /// The server's own short name for what went wrong, such as `repair_required`.
+    var code: String?
 
     var errorDescription: String? { message }
     var isUnauthorized: Bool { status == 401 }
@@ -75,9 +77,10 @@ final class APIClient {
     func sendDiscardingResponse(
         _ method: String,
         _ path: String,
+        query: [String: String?] = [:],
         body: (any Encodable & Sendable)? = nil
     ) async throws {
-        _ = try await perform(method: method, path: path, query: [:], body: try encode(body))
+        _ = try await perform(method: method, path: path, query: query, body: try encode(body))
     }
 
     private func encode(_ body: (any Encodable & Sendable)?) throws -> Data? {
@@ -163,11 +166,12 @@ final class APIClient {
         if http.statusCode == 401, credential != nil {
             onSessionExpired?()
         }
-        let needsTwoFactor = (try? Self.decoder.decode(ErrorResponse.self, from: data))?.mfaRequired ?? false
+        let reply = try? Self.decoder.decode(ErrorResponse.self, from: data)
         throw APIError(
             status: http.statusCode,
             message: Self.message(for: http.statusCode, data: data),
-            needsTwoFactor: needsTwoFactor
+            needsTwoFactor: reply?.mfaRequired ?? false,
+            code: reply?.error
         )
     }
 

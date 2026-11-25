@@ -1,0 +1,17 @@
+// Build settings for the app that are not in project.yml.
+
+// Apple Wallet sync reads Wallet through FinanceKit. Apple only lets an app do
+// that if it has the FinanceKit entitlement, which Apple grants to a developer
+// team on request. A build signed with the entitlement before Apple has
+// granted it will not install on a phone, so it is off unless you turn it on.
+//
+// To turn it on, once Apple has granted your team the entitlement, create
+// Config/Local.xcconfig (it is ignored by git) with these two lines:
+//
+//   WALLET_SYNC_ENABLED = YES
+//   CODE_SIGN_ENTITLEMENTS = SurelyNot/Wallet.entitlements
+//
+// See "Apple Wallet" in README.md.
+WALLET_SYNC_ENABLED = NO
+
+#include? "Local.xcconfig"

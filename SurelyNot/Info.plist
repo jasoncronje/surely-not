@@ -29,6 +29,8 @@
 	</dict>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Surely Not uses Face ID to keep your finances private when the lock is on.</string>
+	<key>NSFinancialDataUsageDescription</key>
+	<string>Surely Not sends the Wallet accounts you choose, with their balances and transactions, to your own Sure server.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Manrope.ttf</string>
@@ -39,5 +41,7 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
+	<key>WalletSyncEnabled</key>
+	<string>$(WALLET_SYNC_ENABLED)</string>
 </dict>
 </plist>
