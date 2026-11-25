@@ -488,6 +488,77 @@ private func decode<T: Decodable>(_ type: T.Type, _ json: String) throws -> T {
     }
 }
 
+@Suite struct WidgetSnapshotTests {
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        return calendar
+    }
+
+    private func day(_ text: String) throws -> Date {
+        try #require(Day.date(text))
+    }
+
+    private func bill(_ id: String, due: String, cents: Int = 1000, paid: Bool = false) -> WidgetSnapshot.Bill {
+        WidgetSnapshot.Bill(id: id, name: "Bill \(id)", cents: cents, dueDate: due, isPaid: paid, autopay: false)
+    }
+
+    private func snapshot(_ bills: [WidgetSnapshot.Bill]) -> WidgetSnapshot {
+        WidgetSnapshot(updatedAt: .now, month: "2026-11", currency: "USD", bills: bills, budget: nil)
+    }
+
+    @Test func addsUpOnlyWhatIsUnpaidSoonestFirst() {
+        let data = snapshot([
+            bill("a", due: "2026-11-26", cents: 8755),
+            bill("b", due: "2026-11-05", cents: 1299, paid: true),
+            bill("c", due: "2026-11-23", cents: 13000),
+        ])
+        #expect(data.unpaid.map(\.id) == ["c", "a"])
+        #expect(data.toPayCents == 21755)
+    }
+
+    @Test func goesStaleWhenTheMonthTurns() throws {
+        let data = snapshot([])
+        #expect(data.isCurrent(at: try day("2026-11-30"), calendar: calendar))
+        #expect(!data.isCurrent(at: try day("2026-12-01"), calendar: calendar))
+    }
+
+    @Test func theDueLineCountsDown() throws {
+        let rent = bill("a", due: "2026-11-26")
+        #expect(WidgetSnapshot.dueLine(for: rent, at: try day("2026-11-23"), calendar: calendar) == "Due in 3 days")
+        #expect(WidgetSnapshot.dueLine(for: rent, at: try day("2026-11-25"), calendar: calendar) == "Due tomorrow")
+        #expect(WidgetSnapshot.dueLine(for: rent, at: try day("2026-11-26"), calendar: calendar) == "Due today")
+        #expect(WidgetSnapshot.dueLine(for: rent, at: try day("2026-11-28"), calendar: calendar) == "Not seen yet")
+    }
+
+    /// The shared keychain group is what lets the widget read this at all.
+    @Test func theStoreHandsBackWhatItWasGiven() throws {
+        try #require(WidgetStore.group != nil)
+        let before = WidgetStore.load()
+        defer {
+            if let before { WidgetStore.save(before) } else { WidgetStore.clear() }
+        }
+        let data = snapshot([bill("a", due: "2026-11-26")])
+        #expect(WidgetStore.save(data))
+        #expect(WidgetStore.load()?.bills == data.bills)
+        WidgetStore.clear()
+        #expect(WidgetStore.load() == nil)
+    }
+
+    @Test func survivesBeingSavedAndRead() throws {
+        let data = WidgetSnapshot(
+            updatedAt: Date(timeIntervalSince1970: 1_800_000_000),
+            month: "2026-11",
+            currency: "USD",
+            bills: [bill("a", due: "2026-11-26")],
+            budget: .init(spent: 50, budgeted: 200)
+        )
+        let copy = try JSONDecoder().decode(WidgetSnapshot.self, from: JSONEncoder().encode(data))
+        #expect(copy == data)
+        #expect(copy.budget?.fraction == 0.25)
+    }
+}
+
 @Suite struct PortfolioTests {
     private func holding(
         _ id: String,

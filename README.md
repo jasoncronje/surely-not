@@ -16,6 +16,7 @@ Four tabs, each backed by Sure's REST API (`/api/v1`):
 - **Chat**: Sure's AI assistant. Start, rename and delete chats, send messages, retry failed replies.
 - **Budgets**: each month's budget with spending per category. Tap a category to see that month's transactions in it.
 - **Investments**: every position across your investment accounts, each one's share of the total, and how the total and each position have moved over the last 90 days. Reached from Accounts.
+- **Widget**: a home screen and lock screen widget with what is still to pay this month, the next bills due, and spending against the month's budget. It shows what the app last loaded; iOS wakes the app in the background now and then to refresh it. Amounts are hidden while the phone is locked.
 - **Lock**: an optional Face ID, Touch ID or passcode lock, switched on in Settings. It asks on opening and after a minute away, and hides the figures in the app switcher.
 - **Accounts**: accounts grouped by type, 90-day balance history, holdings, and transactions you can add, edit and delete.
 - **Apple Wallet**: sends Apple Card, Apple Cash and Savings from Wallet on your phone to Sure, with balances and transactions. Reached from Accounts. See [Apple Wallet](#apple-wallet) for what it needs.

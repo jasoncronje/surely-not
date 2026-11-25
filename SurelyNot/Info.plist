@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>io.cronje.surelynot.refresh</string>
+	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -35,6 +39,10 @@
 	<array>
 		<string>Manrope.ttf</string>
 	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>
@@ -43,5 +51,7 @@
 	</array>
 	<key>WalletSyncEnabled</key>
 	<string>$(WALLET_SYNC_ENABLED)</string>
+	<key>WidgetKeychainGroup</key>
+	<string>$(AppIdentifierPrefix)$(WIDGET_KEYCHAIN_GROUP)</string>
 </dict>
 </plist>

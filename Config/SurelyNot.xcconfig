@@ -14,4 +14,8 @@
 // See "Apple Wallet" in README.md.
 WALLET_SYNC_ENABLED = NO
 
+// The app's entitlements: the keychain group it shares with its home screen
+// widget. Wallet.entitlements carries the same group plus FinanceKit.
+CODE_SIGN_ENTITLEMENTS = SurelyNot/SurelyNot.entitlements
+
 #include? "Local.xcconfig"

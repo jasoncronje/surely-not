@@ -4,6 +4,7 @@ import SwiftUI
 struct SurelyNotApp: App {
     @State private var session = Session()
     @State private var lock = AppLock()
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         Theme.applyBarAppearance()
@@ -28,6 +29,17 @@ struct SurelyNotApp: App {
             .font(Theme.body)
             // Controls stay neutral. Colour is kept for the data.
             .tint(Theme.text)
+        }
+        .onChange(of: scenePhase) {
+            if scenePhase == .background, session.isSignedIn {
+                WidgetFeed.scheduleRefresh()
+            }
+        }
+        // iOS wakes the app now and then to keep the widget's bills current.
+        .backgroundTask(.appRefresh(WidgetFeed.refreshTask)) {
+            if let client = await session.client {
+                await WidgetFeed.refresh(client: client)
+            }
         }
     }
 }

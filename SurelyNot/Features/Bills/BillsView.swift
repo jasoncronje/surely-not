@@ -46,6 +46,9 @@ final class BillsModel {
                 suggestions: BillSchedule.suggestions(from: bills)
             )
         }
+        if let snapshot = state.value {
+            await WidgetFeed.publish(statuses: snapshot.statuses, client: client)
+        }
     }
 
     /// Starts or stops tracking a repeating payment, then loads the new picture.

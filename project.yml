@@ -11,11 +11,16 @@ settings:
     SWIFT_APPROACHABLE_CONCURRENCY: YES
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
+    # The keychain group through which the app hands the widget its figures.
+    # Xcode puts the team's prefix in front, so it needs no setup with Apple.
+    WIDGET_KEYCHAIN_GROUP: io.cronje.surelynot.shared
 targets:
   SurelyNot:
     type: application
     platform: iOS
-    sources: [SurelyNot]
+    sources: [SurelyNot, Shared]
+    dependencies:
+      - target: SurelyNotWidgets
     configFiles:
       Debug: Config/SurelyNot.xcconfig
       Release: Config/SurelyNot.xcconfig
@@ -34,6 +39,9 @@ targets:
           NSAllowsLocalNetworking: true
         NSFinancialDataUsageDescription: Surely Not sends the Wallet accounts you choose, with their balances and transactions, to your own Sure server.
         WalletSyncEnabled: $(WALLET_SYNC_ENABLED)
+        WidgetKeychainGroup: $(AppIdentifierPrefix)$(WIDGET_KEYCHAIN_GROUP)
+        UIBackgroundModes: [fetch]
+        BGTaskSchedulerPermittedIdentifiers: [io.cronje.surelynot.refresh]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.cronje.surelynot
@@ -42,6 +50,25 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
     scheme:
       testTargets: [SurelyNotTests]
+  SurelyNotWidgets:
+    type: app-extension
+    platform: iOS
+    sources: [SurelyNotWidgets, Shared]
+    info:
+      path: SurelyNotWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Surely Not
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        WidgetKeychainGroup: $(AppIdentifierPrefix)$(WIDGET_KEYCHAIN_GROUP)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.cronje.surelynot.widgets
+        CODE_SIGN_ENTITLEMENTS: SurelyNotWidgets/Widgets.entitlements
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: YES
   SurelyNotTests:
     type: bundle.unit-test
     platform: iOS

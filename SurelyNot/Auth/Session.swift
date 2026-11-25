@@ -188,6 +188,7 @@ final class Session {
 
     func signOut() {
         KeychainStore.clear()
+        WidgetFeed.clear()
         client = nil
         serverURL = nil
     }
