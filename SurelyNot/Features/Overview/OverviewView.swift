@@ -198,12 +198,19 @@ struct OverviewView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ScreenHeader(title: "Home") {
+            HStack(alignment: .center, spacing: 10) {
+                ProductMark(size: 30)
+                Text("Surely Not")
+                    .font(Theme.title)
+                    .foregroundStyle(Theme.text)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer()
                 Button("Settings", systemImage: "gearshape") {
                     showingSettings = true
                 }
                 .buttonStyle(IconButtonStyle())
             }
+            .frame(minHeight: 44)
             if let spending = model.spending.value, let finding = SpendingFinding.sentence(for: spending) {
                 Text(finding)
                     .font(Theme.body)

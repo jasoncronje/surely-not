@@ -135,17 +135,8 @@ struct AccountsView: View {
                                 EmptyNote(text: "No accounts yet. Connect Apple Wallet, or add one below.")
                             }
                         }
-                        if summary.assets != nil || summary.debts != nil {
-                            totals(summary)
-                        }
-                        if let note = summary.note {
-                            Text(note)
-                                .font(Theme.small)
-                                .foregroundStyle(Theme.muted)
-                                .padding(.horizontal, 4)
-                        }
                         // Wallet sync is what the app adds over Sure on the web,
-                        // so it sits right under the totals.
+                        // so it sits first.
                         NavigationLink {
                             WalletView(client: client)
                         } label: {
@@ -199,34 +190,6 @@ struct AccountsView: View {
                 Task { await model.load() }
             }
         }
-    }
-
-    /// What you own and what you owe, as one panel split in two.
-    private func totals(_ summary: AccountsSummary) -> some View {
-        HStack(spacing: 0) {
-            totalCell(label: "You own", value: summary.assets)
-            Rectangle().fill(Theme.rule).frame(width: 1)
-            totalCell(label: "You owe", value: summary.debts)
-                .padding(.leading, Theme.cardPadding)
-        }
-        .padding(Theme.cardPadding)
-        .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
-    }
-
-    private func totalCell(label: String, value: String?) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label)
-                .font(Theme.small)
-                .foregroundStyle(Theme.muted)
-            Text(value ?? "–")
-                .font(Theme.font(22, .semibold, relativeTo: .title2))
-                .monospacedDigit()
-                .foregroundStyle(value == nil ? Theme.muted : Theme.text)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
     }
 
     private func groupCard(_ group: AccountGroup) -> some View {

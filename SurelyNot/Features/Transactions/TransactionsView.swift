@@ -342,12 +342,6 @@ struct TransactionsView: View {
                     ? "No transactions yet."
                     : "Nothing matches. Try a wider period or fewer filters.")
             }
-        } else if let total = model.total {
-            Text(total == 1 ? "1 transaction" : "\(total.formatted()) transactions")
-                .font(Theme.small)
-                .foregroundStyle(Theme.muted)
-                .padding(.horizontal, 4)
-                .opacity(model.isLoading ? 0.5 : 1)
         }
     }
 }

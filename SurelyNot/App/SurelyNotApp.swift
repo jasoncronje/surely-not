@@ -143,6 +143,68 @@ struct SettingsView: View {
         })
     }
 
+    @State private var serverCheck: ServerCheck = .idle
+
+    /// Where the last server test got to.
+    enum ServerCheck: Equatable {
+        case idle, checking
+        case worked(milliseconds: Int)
+        case failed(String)
+    }
+
+    /// Asks the server for the account list: that proves it answers and
+    /// still accepts this sign-in, and it changes nothing.
+    private func testServer() async {
+        guard let client = session.client else {
+            serverCheck = .failed("Not signed in.")
+            return
+        }
+        serverCheck = .checking
+        let start = ContinuousClock.now
+        do {
+            _ = try await client.accounts()
+            let elapsed = ContinuousClock.now - start
+            serverCheck = .worked(milliseconds: Int(elapsed.components.seconds * 1000 + elapsed.components.attoseconds / 1_000_000_000_000_000))
+        } catch {
+            serverCheck = .failed(error.localizedDescription)
+        }
+    }
+
+    @ViewBuilder
+    private var serverCheckRow: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Test connection")
+                    .font(Theme.bodyStrong)
+                    .foregroundStyle(Theme.text)
+                Group {
+                    switch serverCheck {
+                    case .idle: Text("Checks the server answers and you are still signed in.")
+                    case .checking: Text("Checking…")
+                    case .worked(let ms): Text("Works. Answered in \(ms) ms.")
+                    case .failed(let message): Text(message)
+                    }
+                }
+                .font(Theme.small)
+                .foregroundStyle({
+                    if case .failed = serverCheck { return Theme.negative }
+                    return Theme.muted
+                }())
+            }
+            Spacer(minLength: 8)
+            if serverCheck == .checking {
+                ProgressView()
+            } else {
+                Button("Test") {
+                    Task { await testServer() }
+                }
+                .font(Theme.smallStrong)
+                .foregroundStyle(Theme.text)
+                .frame(minHeight: 44)
+            }
+        }
+    }
+
     @State private var remindersOn = BillReminders.isEnabled
     @State private var remindersWaiting = 0
     @State private var remindersRefused = false
@@ -204,6 +266,8 @@ struct SettingsView: View {
                         }
                         RowRule()
                         FigureRow(label: "Server", value: session.serverURL?.host() ?? "Not signed in")
+                        RowRule()
+                        serverCheckRow
                     }
                     Card {
                         Toggle(isOn: lockIsOn) {

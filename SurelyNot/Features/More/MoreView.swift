@@ -17,8 +17,6 @@ struct MoreView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.gap) {
-                    ScreenHeader(title: "More")
-                        .padding(.top, 8)
                     MoreSection(title: "Money") {
                         NavigationLink {
                             AccountsView(client: client)
