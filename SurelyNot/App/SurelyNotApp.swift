@@ -173,50 +173,35 @@ struct SettingsView: View {
     /// The server, how it last answered, and the way to ask again, as one
     /// row: the status sits under the name it describes.
     private var serverRow: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Server")
-                    .font(Theme.small)
-                    .foregroundStyle(Theme.muted)
-                Text(session.serverURL?.host() ?? "Not signed in")
-                    .font(Theme.bodyStrong)
-                    .foregroundStyle(Theme.text)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Circle()
-                        .fill(serverDot)
-                        .frame(width: 8, height: 8)
-                        .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
-                    Text(serverStatus)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Server")
                         .font(Theme.small)
-                        .foregroundStyle(serverCheck == .idle ? Theme.muted : Theme.text)
-                        .lineLimit(3)
-                        .contentTransition(.opacity)
+                        .foregroundStyle(Theme.muted)
+                    Text(session.serverURL?.host() ?? "Not signed in")
+                        .font(Theme.bodyStrong)
+                        .foregroundStyle(Theme.text)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                 }
-                .padding(.top, 2)
+                .accessibilityElement(children: .combine)
+                Spacer(minLength: 8)
+                testButton
             }
-            .accessibilityElement(children: .combine)
-            Spacer(minLength: 8)
-            Button {
-                Task { await testServer() }
-            } label: {
-                ZStack {
-                    Text("Test").opacity(serverCheck == .checking ? 0 : 1)
-                    ProgressView()
-                        .controlSize(.small)
-                        .tint(Theme.text)
-                        .opacity(serverCheck == .checking ? 1 : 0)
-                }
-                .font(Theme.smallStrong)
-                .foregroundStyle(Theme.text)
-                .frame(minWidth: 72, minHeight: 36)
-                .background(Theme.raised, in: .capsule)
-                .contentShape(.capsule)
+            // The answer spans the card, so a long error reads as a sentence.
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Circle()
+                    .fill(serverDot)
+                    .frame(width: 8, height: 8)
+                    .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
+                    .accessibilityHidden(true)
+                Text(serverStatus)
+                    .font(Theme.small)
+                    .foregroundStyle(serverCheck == .idle ? Theme.muted : Theme.text)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .contentTransition(.opacity)
             }
-            .buttonStyle(.plain)
-            .disabled(serverCheck == .checking || session.client == nil)
-            .accessibilityLabel("Test connection")
         }
         .animation(.snappy(duration: 0.25), value: serverCheck)
         .sensoryFeedback(trigger: serverCheck) { _, new in
@@ -226,6 +211,28 @@ struct SettingsView: View {
             default: nil
             }
         }
+    }
+
+    private var testButton: some View {
+        Button {
+            Task { await testServer() }
+        } label: {
+            ZStack {
+                Text("Test").opacity(serverCheck == .checking ? 0 : 1)
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(Theme.text)
+                    .opacity(serverCheck == .checking ? 1 : 0)
+            }
+            .font(Theme.smallStrong)
+            .foregroundStyle(Theme.text)
+            .frame(minWidth: 72, minHeight: 36)
+            .background(Theme.raised, in: .capsule)
+            .contentShape(.capsule)
+        }
+        .buttonStyle(.plain)
+        .disabled(serverCheck == .checking || session.client == nil)
+        .accessibilityLabel("Test connection")
     }
 
     private var serverStatus: String {
