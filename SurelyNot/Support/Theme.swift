@@ -38,6 +38,9 @@ enum Theme {
     static let gap: CGFloat = 16
     static let cardPadding: CGFloat = 20
     static let margin: CGFloat = 16
+    /// Space under the last thing on a screen. The tab bar shrinks to a
+    /// floating button while scrolling down, and this keeps it off the last row.
+    static let bottomRoom: CGFloat = 96
 
     // MARK: Type
 

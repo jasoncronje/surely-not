@@ -44,7 +44,7 @@ struct InvestmentsView: View {
                 }
             }
             .padding(.horizontal, Theme.margin)
-            .padding(.bottom, 24)
+            .padding(.bottom, Theme.bottomRoom)
         }
         .screenBackground()
         .navigationTitle("Investments")
@@ -126,24 +126,26 @@ private struct PositionRow: View {
     var body: some View {
         HStack(spacing: 12) {
             LetterTile(name: position.symbol, tint: Tint(name: position.symbol))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(position.symbol)
-                    .font(Theme.body)
+            NameAmount {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(position.symbol)
+                        .font(Theme.body)
+                        .foregroundStyle(Theme.text)
+                        .lineLimit(1)
+                    Text(detail)
+                        .font(Theme.small)
+                        .foregroundStyle(Theme.muted)
+                        .lineLimit(1)
+                }
+            } amount: {
+                Text(position.amount)
+                    .font(Theme.bodyStrong)
+                    .monospacedDigit()
                     .foregroundStyle(Theme.text)
-                    .lineLimit(1)
-                Text(detail)
-                    .font(Theme.small)
-                    .foregroundStyle(Theme.muted)
-                    .lineLimit(1)
             }
-            Spacer(minLength: 8)
-            Text(position.amount)
-                .font(Theme.bodyStrong)
-                .monospacedDigit()
-                .foregroundStyle(Theme.text)
-                .layoutPriority(1)
         }
         .padding(.horizontal, 16)
+        .padding(.vertical, 10)
         .frame(minHeight: 64)
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
@@ -204,7 +206,7 @@ private struct PositionView: View {
                 }
             }
             .padding(.horizontal, Theme.margin)
-            .padding(.bottom, 24)
+            .padding(.bottom, Theme.bottomRoom)
         }
         .screenBackground()
         .navigationTitle(position.symbol)

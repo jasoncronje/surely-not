@@ -145,7 +145,7 @@ struct BudgetsView: View {
                     }
                 }
                 .padding(.horizontal, Theme.margin)
-                .padding(.bottom, 24)
+                .padding(.bottom, Theme.bottomRoom)
             }
             .screenBackground()
             .toolbar(.hidden, for: .navigationBar)

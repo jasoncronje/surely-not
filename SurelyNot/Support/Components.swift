@@ -139,6 +139,37 @@ struct MoneyText: View {
     }
 }
 
+/// A name and its amount: side by side, or the amount under the name once
+/// the text is set very large, where the two no longer fit on one line.
+/// Either way the amount stays on one line and is never broken mid-number.
+struct NameAmount<Name: View, Amount: View>: View {
+    var alignment: VerticalAlignment = .center
+    @ViewBuilder let name: Name
+    @ViewBuilder let amount: Amount
+    @Environment(\.dynamicTypeSize) private var textSize
+
+    var body: some View {
+        if textSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 4) {
+                name
+                amount
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            HStack(alignment: alignment, spacing: 8) {
+                name
+                Spacer(minLength: 0)
+                amount
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .layoutPriority(1)
+            }
+        }
+    }
+}
+
 /// A label on the left and a figure on the right.
 struct FigureRow: View {
     let label: String
@@ -146,11 +177,11 @@ struct FigureRow: View {
     var valueColor: Color = Theme.text
 
     var body: some View {
-        HStack {
+        NameAmount {
             Text(label)
                 .font(Theme.body)
                 .foregroundStyle(Theme.muted)
-            Spacer()
+        } amount: {
             Text(value)
                 .font(Theme.bodyStrong)
                 .monospacedDigit()

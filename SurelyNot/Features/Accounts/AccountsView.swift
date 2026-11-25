@@ -166,7 +166,7 @@ struct AccountsView: View {
                     .padding(.top, 8)
                 }
                 .padding(.horizontal, Theme.margin)
-                .padding(.bottom, 24)
+                .padding(.bottom, Theme.bottomRoom)
             }
             .screenBackground()
             .toolbar(.hidden, for: .navigationBar)
@@ -264,27 +264,29 @@ private struct AccountRow: View {
     var body: some View {
         HStack(spacing: 12) {
             LetterTile(name: owner, tint: Tint(name: owner), round: true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(account.name)
-                    .font(Theme.body)
-                    .foregroundStyle(Theme.text)
-                    .lineLimit(1)
-                if let institution = account.institutionName, !institution.isEmpty {
-                    Text(institution)
-                        .font(Theme.small)
-                        .foregroundStyle(Theme.muted)
+            NameAmount {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(account.name)
+                        .font(Theme.body)
+                        .foregroundStyle(Theme.text)
                         .lineLimit(1)
+                    if let institution = account.institutionName, !institution.isEmpty {
+                        Text(institution)
+                            .font(Theme.small)
+                            .foregroundStyle(Theme.muted)
+                            .lineLimit(1)
+                    }
                 }
+            } amount: {
+                Text(account.balance)
+                    .font(Theme.bodyStrong)
+                    .monospacedDigit()
+                    // A zero balance steps back so the accounts with money stand out.
+                    .foregroundStyle(account.balanceCents == 0 ? Theme.muted : Theme.text)
             }
-            Spacer(minLength: 8)
-            Text(account.balance)
-                .font(Theme.bodyStrong)
-                .monospacedDigit()
-                // A zero balance steps back so the accounts with money stand out.
-                .foregroundStyle(account.balanceCents == 0 ? Theme.muted : Theme.text)
-                .layoutPriority(1)
         }
         .padding(.horizontal, 16)
+        .padding(.vertical, 10)
         .frame(minHeight: 68)
         .contentShape(.rect)
         .accessibilityElement(children: .combine)

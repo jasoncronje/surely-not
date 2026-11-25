@@ -157,7 +157,7 @@ struct BillsView: View {
                 }
             }
             .padding(.horizontal, Theme.margin)
-            .padding(.bottom, 24)
+            .padding(.bottom, Theme.bottomRoom)
         }
         .screenBackground()
         .navigationTitle("Bills")
@@ -298,7 +298,7 @@ private struct SuggestionsView: View {
                 .clipShape(.rect(cornerRadius: Theme.cardRadius))
             }
             .padding(.horizontal, Theme.margin)
-            .padding(.bottom, 24)
+            .padding(.bottom, Theme.bottomRoom)
         }
         .screenBackground()
         .navigationTitle("Suggested")
@@ -397,24 +397,26 @@ struct BillRow: View {
     var body: some View {
         HStack(spacing: 12) {
             LetterTile(name: bill.title, tint: Tint(name: bill.title))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(bill.title)
-                    .font(Theme.body)
-                    .foregroundStyle(Theme.text)
-                    .lineLimit(1)
-                Text(line)
-                    .font(Theme.small)
-                    .foregroundStyle(lineColor)
-                    .lineLimit(1)
+            NameAmount {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(bill.title)
+                        .font(Theme.body)
+                        .foregroundStyle(Theme.text)
+                        .lineLimit(1)
+                    Text(line)
+                        .font(Theme.small)
+                        .foregroundStyle(lineColor)
+                        .lineLimit(1)
+                }
+            } amount: {
+                Text(amount ?? bill.displayAmount)
+                    .font(Theme.bodyStrong)
+                    .monospacedDigit()
+                    .foregroundStyle(bill.isIncome ? Theme.positive : Theme.text)
             }
-            Spacer(minLength: 8)
-            Text(amount ?? bill.displayAmount)
-                .font(Theme.bodyStrong)
-                .monospacedDigit()
-                .foregroundStyle(bill.isIncome ? Theme.positive : Theme.text)
-                .layoutPriority(1)
         }
         .padding(.horizontal, 16)
+        .padding(.vertical, 10)
         .frame(minHeight: 64)
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
@@ -581,7 +583,7 @@ struct BillDetailView: View {
                 }
             }
             .padding(.horizontal, Theme.margin)
-            .padding(.bottom, 24)
+            .padding(.bottom, Theme.bottomRoom)
         }
         .screenBackground()
         .navigationTitle(bill.isIncome ? "Money in" : "Bill")

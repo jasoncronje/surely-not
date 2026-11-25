@@ -33,7 +33,7 @@ struct WalletView: View {
                 }
             }
             .padding(.horizontal, Theme.margin)
-            .padding(.bottom, 24)
+            .padding(.bottom, Theme.bottomRoom)
         }
         .screenBackground()
         .navigationTitle("Apple Wallet")
@@ -454,7 +454,7 @@ struct WalletReviewView: View {
                 }
             }
             .padding(.horizontal, Theme.margin)
-            .padding(.bottom, 24)
+            .padding(.bottom, Theme.bottomRoom)
         }
         .screenBackground()
         .navigationTitle("Needs a look")

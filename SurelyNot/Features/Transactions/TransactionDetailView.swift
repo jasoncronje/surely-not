@@ -140,7 +140,7 @@ struct TransactionDetailView: View {
                 }
             }
             .padding(.horizontal, Theme.margin)
-            .padding(.bottom, 24)
+            .padding(.bottom, Theme.bottomRoom)
         }
         .screenBackground()
         .navigationTitle("Transaction")

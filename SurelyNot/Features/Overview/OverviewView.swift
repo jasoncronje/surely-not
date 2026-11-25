@@ -137,7 +137,7 @@ struct OverviewView: View {
                     }
                 }
                 .padding(.horizontal, Theme.margin)
-                .padding(.bottom, 24)
+                .padding(.bottom, Theme.bottomRoom)
             }
             .screenBackground()
             .toolbar(.hidden, for: .navigationBar)
@@ -569,20 +569,22 @@ struct CategoryPaceRow: View {
         HStack(alignment: .top, spacing: 12) {
             LetterTile(name: name, tint: tint)
             VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline) {
+                NameAmount(alignment: .firstTextBaseline) {
                     Text(name)
                         .font(Theme.body)
                         .foregroundStyle(Theme.text)
                         .lineLimit(1)
-                    Spacer()
-                    Text(amount)
-                        .font(Theme.bodyStrong)
-                        .monospacedDigit()
-                        .foregroundStyle(Theme.text)
-                    if showsChevron {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Theme.muted)
+                } amount: {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(amount)
+                            .font(Theme.bodyStrong)
+                            .monospacedDigit()
+                            .foregroundStyle(Theme.text)
+                        if showsChevron {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Theme.muted)
+                        }
                     }
                 }
                 PaceBar(value: value, reference: reference, scale: scale)
