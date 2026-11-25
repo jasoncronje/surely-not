@@ -48,6 +48,9 @@ struct WalletView: View {
         .sheet(isPresented: $isSettingUp) {
             WalletSetupView(client: client)
         }
+        .sheet(isPresented: $isConfirmingDisconnect) {
+            WalletDisconnectSheet()
+        }
     }
 
     private var introduction: some View {
@@ -197,24 +200,6 @@ struct WalletView: View {
                 .font(Theme.bodyStrong)
                 .foregroundStyle(Theme.negative)
                 .disabled(wallet.isWorking)
-                // Anchored here, so on iOS 26 the choices open from this button.
-                .confirmationDialog(
-                    "Disconnect Apple Wallet?",
-                    isPresented: $isConfirmingDisconnect,
-                    titleVisibility: .visible
-                ) {
-                    Button("Disconnect, keep imported data") {
-                        Task { await wallet.disconnect(removingImported: false) }
-                    }
-                    if wallet.serverCanDiscard {
-                        Button("Disconnect and remove imported data", role: .destructive) {
-                            Task { await wallet.disconnect(removingImported: true) }
-                        }
-                    }
-                    Button("Cancel", role: .cancel) {}
-                } message: {
-                    Text("Sure stops getting new Wallet activity. Removing what was imported cannot be undone.")
-                }
                 Text("Sure stops getting new activity. You choose whether to keep what it already has.")
                     .font(Theme.small)
                     .foregroundStyle(Theme.muted)
@@ -235,6 +220,109 @@ struct WalletView: View {
     private func lastSynced(_ link: WalletLink) -> String {
         guard let date = link.lastSyncedAt else { return "Not yet" }
         return date.formatted(.relative(presentation: .named))
+    }
+}
+
+/// Asks how to disconnect: keep what Sure imported, or remove it too.
+struct WalletDisconnectSheet: View {
+    @Environment(WalletSync.self) private var wallet
+    @Environment(\.dismiss) private var dismiss
+    @State private var removing = false
+    @State private var height: CGFloat = 420
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Disconnect Apple Wallet?")
+                    .font(Theme.section)
+                    .foregroundStyle(Theme.text)
+                    .accessibilityAddTraits(.isHeader)
+                Text("Sure stops getting new activity from Wallet.")
+                    .font(Theme.body)
+                    .foregroundStyle(Theme.muted)
+            }
+
+            if wallet.serverCanDiscard {
+                VStack(spacing: 0) {
+                    choice(
+                        "Keep what was imported",
+                        detail: "The accounts and transactions stay in Sure.",
+                        isOn: !removing
+                    ) { removing = false }
+                    RowRule().padding(.horizontal, 16)
+                    choice(
+                        "Remove what was imported",
+                        detail: "Sure deletes the accounts and transactions Wallet sent. This cannot be undone.",
+                        isOn: removing
+                    ) { removing = true }
+                }
+                .background(Theme.surface, in: .rect(cornerRadius: 16))
+            }
+
+            VStack(spacing: 4) {
+                Button(removing ? "Disconnect and remove" : "Disconnect") {
+                    let remove = removing
+                    dismiss()
+                    Task { await wallet.disconnect(removingImported: remove) }
+                }
+                .buttonStyle(DisconnectButtonStyle(isDestructive: removing))
+                Button("Cancel") { dismiss() }
+                    .font(Theme.bodyStrong)
+                    .foregroundStyle(Theme.text)
+                    .frame(maxWidth: .infinity, minHeight: 48)
+            }
+            .animation(.snappy(duration: 0.2), value: removing)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 28)
+        .padding(.bottom, 8)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+        .presentationDetents([.height(height)])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Theme.ground)
+        .presentationCornerRadius(32)
+    }
+
+    private func choice(_ title: String, detail: String, isOn: Bool, select: @escaping () -> Void) -> some View {
+        Button(action: select) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(Theme.body)
+                        .foregroundStyle(Theme.text)
+                    Text(detail)
+                        .font(Theme.small)
+                        .foregroundStyle(Theme.muted)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22))
+                    .foregroundStyle(isOn ? Theme.text : Theme.control)
+                    .accessibilityHidden(true)
+            }
+            .padding(16)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+    }
+}
+
+/// The confirming button: neutral to disconnect, red once removal is chosen.
+private struct DisconnectButtonStyle: ButtonStyle {
+    let isDestructive: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(Theme.bodyStrong)
+            .foregroundStyle(isDestructive ? Color.white : Theme.onPrimary)
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .background(isDestructive ? Theme.negative : Theme.primary, in: .rect(cornerRadius: Theme.controlRadius))
+            .opacity(configuration.isPressed ? 0.8 : 1)
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.snappy(duration: 0.15), value: configuration.isPressed)
     }
 }
 
