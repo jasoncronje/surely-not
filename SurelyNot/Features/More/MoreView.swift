@@ -73,15 +73,14 @@ private struct MoreSection<Rows: View>: View {
                 Group(subviews: rows) { subviews in
                     ForEach(Array(subviews.enumerated()), id: \.offset) { index, row in
                         if index > 0 {
-                            RowRule().padding(.leading, 68)
+                            RowRule(inset: .tile)
                         }
                         row
                     }
                 }
             }
             .buttonStyle(RowButtonStyle())
-            .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
-            .clipShape(.rect(cornerRadius: Theme.cardRadius))
+            .rowGroup()
         }
         .padding(.top, 8)
     }
@@ -96,7 +95,7 @@ private struct MoreRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: systemImage)
-                .font(.system(size: 17, weight: .medium))
+                .font(Theme.glyph)
                 .foregroundStyle(Theme.muted)
                 .frame(width: 40, height: 40)
                 .background(Theme.raised, in: .circle)
@@ -111,9 +110,7 @@ private struct MoreRow: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
-            Image(systemName: "chevron.right")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Theme.muted)
+            DisclosureChevron()
         }
         .padding(.horizontal, 16)
         .frame(minHeight: 68)

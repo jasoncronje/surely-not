@@ -117,17 +117,7 @@ struct MainTabView: View {
                 Task { await wallet.syncIfDue() }
             }
         }
-        .alert(
-            "That did not work",
-            isPresented: Binding(
-                get: { categoryChanger.error != nil },
-                set: { if !$0 { categoryChanger.error = nil } }
-            )
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(categoryChanger.error ?? "")
-        }
+        .errorSheet(Binding(get: { categoryChanger.error }, set: { categoryChanger.error = $0 }))
     }
 }
 
@@ -288,13 +278,6 @@ struct SettingsView: View {
         }
     }
 
-    private var lockErrorShown: Binding<Bool> {
-        Binding(
-            get: { !(lock.error ?? "").isEmpty },
-            set: { if !$0 { lock.error = nil } }
-        )
-    }
-
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -355,16 +338,12 @@ struct SettingsView: View {
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .task { remindersWaiting = await BillReminders.waitingCount() }
-            .alert("Notifications are off", isPresented: $remindersRefused) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text("Allow notifications for Surely Not in the Settings app, then turn reminders on again.")
-            }
-            .alert("The lock was not changed", isPresented: lockErrorShown) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(lock.error ?? "")
-            }
+            .messageSheet(
+                "Notifications are off",
+                isPresented: $remindersRefused,
+                message: "Allow notifications for Surely Not in the Settings app, then turn reminders on again."
+            )
+            .errorSheet(Binding(get: { lock.error }, set: { lock.error = $0 }), title: "The lock was not changed")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }

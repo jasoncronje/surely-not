@@ -150,8 +150,7 @@ struct AccountsView: View {
                                 LinkRow(title: "All investments")
                             }
                             .buttonStyle(RowButtonStyle())
-                            .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
-                            .clipShape(.rect(cornerRadius: Theme.cardRadius))
+                            .rowGroup()
                         }
                         ForEach(summary.groups) { group in
                             groupCard(group)
@@ -211,7 +210,7 @@ struct AccountsView: View {
             VStack(spacing: 0) {
                 ForEach(Array(group.accounts.enumerated()), id: \.element.id) { index, account in
                     if index > 0 {
-                        RowRule().padding(.leading, 68)
+                        RowRule(inset: .tile)
                     }
                     NavigationLink(value: account) {
                         AccountRow(account: account)
@@ -219,17 +218,8 @@ struct AccountsView: View {
                     .buttonStyle(RowButtonStyle())
                 }
             }
-            .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
-            .clipShape(.rect(cornerRadius: Theme.cardRadius))
+            .rowGroup()
         }
-    }
-}
-
-/// Dims a row while it is pressed.
-struct RowButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .background(configuration.isPressed ? Theme.raised : Color.clear)
     }
 }
 
@@ -279,7 +269,7 @@ struct AddAccountRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: "plus")
-                .font(.system(size: 17, weight: .medium))
+                .font(Theme.glyph)
                 .foregroundStyle(Theme.muted)
                 .frame(width: 40, height: 40)
                 .background(Theme.raised, in: .circle)
@@ -294,12 +284,12 @@ struct AddAccountRow: View {
             }
             Spacer(minLength: 8)
             Image(systemName: "arrow.up.forward")
-                .font(.system(size: 14, weight: .semibold))
+                .font(Theme.glyphSmall)
                 .foregroundStyle(Theme.muted)
         }
         .padding(.horizontal, 16)
         .frame(minHeight: 68)
-        .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
+        .rowGroup()
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)

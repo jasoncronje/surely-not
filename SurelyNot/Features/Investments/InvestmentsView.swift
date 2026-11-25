@@ -90,7 +90,7 @@ struct InvestmentsView: View {
         VStack(spacing: 0) {
             ForEach(Array(positions.enumerated()), id: \.element.id) { index, position in
                 if index > 0 {
-                    RowRule().padding(.leading, 68)
+                    RowRule(inset: .tile)
                 }
                 NavigationLink {
                     PositionView(position: position, share: portfolio.share(of: position))
@@ -100,8 +100,7 @@ struct InvestmentsView: View {
                 .buttonStyle(RowButtonStyle())
             }
         }
-        .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
-        .clipShape(.rect(cornerRadius: Theme.cardRadius))
+        .rowGroup()
     }
 }
 

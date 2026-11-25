@@ -77,13 +77,12 @@ struct ChatListView: View {
                             VStack(spacing: 0) {
                                 ForEach(Array(chats.enumerated()), id: \.element.id) { index, chat in
                                     if index > 0 {
-                                        RowRule().padding(.leading, 16)
+                                        RowRule(inset: .text)
                                     }
                                     row(chat)
                                 }
                             }
-                            .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
-                            .clipShape(.rect(cornerRadius: Theme.cardRadius))
+                            .rowGroup()
                         }
                     }
                 }
@@ -118,11 +117,7 @@ struct ChatListView: View {
                     Task { await model.delete(chat) }
                 }
             }
-            .alert("That did not work", isPresented: actionErrorShown) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(model.actionError ?? "")
-            }
+            .errorSheet(actionError)
             .refreshable { await model.load() }
             // Reloads on every return from a chat, so new chats and titles show up.
             .onAppear {
@@ -147,7 +142,7 @@ struct ChatListView: View {
                 }
             } label: {
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 17, weight: .medium))
+                    .font(Theme.glyph)
                     .foregroundStyle(Theme.muted)
                     .frame(width: 44, height: 44)
                     .contentShape(.rect)
@@ -161,8 +156,8 @@ struct ChatListView: View {
         Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })
     }
 
-    private var actionErrorShown: Binding<Bool> {
-        Binding(get: { model.actionError != nil }, set: { if !$0 { model.actionError = nil } })
+    private var actionError: Binding<String?> {
+        Binding(get: { model.actionError }, set: { model.actionError = $0 })
     }
 }
 

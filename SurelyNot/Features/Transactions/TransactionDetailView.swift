@@ -115,7 +115,7 @@ struct TransactionDetailView: View {
                 VStack(spacing: 0) {
                     ForEach(Array(links.enumerated()), id: \.element.title) { index, link in
                         if index > 0 {
-                            RowRule().padding(.leading, 16)
+                            RowRule(inset: .text)
                         }
                         NavigationLink {
                             TransactionsView(client: client, title: link.title, filter: link.filter)
@@ -125,8 +125,7 @@ struct TransactionDetailView: View {
                         .buttonStyle(RowButtonStyle())
                     }
                 }
-                .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
-                .clipShape(.rect(cornerRadius: Theme.cardRadius))
+                .rowGroup()
 
                 if let merchant = transaction.merchant, !others.isEmpty {
                     Text("Also at \(merchant.name)")
@@ -212,7 +211,7 @@ private struct FactRow: View {
                 .multilineTextAlignment(.trailing)
             if let symbol {
                 Image(systemName: symbol)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(Theme.glyphSmall)
                     .foregroundStyle(Theme.muted)
                     .padding(.leading, -8)
             }
@@ -233,9 +232,7 @@ struct LinkRow: View {
                 .foregroundStyle(Theme.text)
                 .lineLimit(1)
             Spacer(minLength: 8)
-            Image(systemName: "chevron.right")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Theme.muted)
+            DisclosureChevron()
         }
         .padding(.horizontal, 16)
         .frame(minHeight: 56)

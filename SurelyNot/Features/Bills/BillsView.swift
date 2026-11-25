@@ -212,8 +212,7 @@ struct BillsView: View {
                 LinkRow(title: "\(snapshot.suggestions.count) more that Sure has spotted")
             }
             .buttonStyle(RowButtonStyle())
-            .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
-            .clipShape(.rect(cornerRadius: Theme.cardRadius))
+            .rowGroup()
             .padding(.top, 8)
         }
     }
@@ -238,7 +237,7 @@ struct BillsView: View {
         VStack(spacing: 0) {
             ForEach(Array(bills.enumerated()), id: \.element.id) { index, bill in
                 if index > 0 {
-                    RowRule().padding(.leading, 68)
+                    RowRule(inset: .tile)
                 }
                 NavigationLink {
                     BillDetailView(client: client, model: model, bill: bill, status: nil)
@@ -248,8 +247,7 @@ struct BillsView: View {
                 .buttonStyle(RowButtonStyle())
             }
         }
-        .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
-        .clipShape(.rect(cornerRadius: Theme.cardRadius))
+        .rowGroup()
     }
 
     static func nextLine(for bill: Bill) -> String {
@@ -279,7 +277,7 @@ private struct SuggestionsView: View {
                 VStack(spacing: 0) {
                     ForEach(Array(bills.enumerated()), id: \.element.id) { index, bill in
                         if index > 0 {
-                            RowRule().padding(.leading, 68)
+                            RowRule(inset: .tile)
                         }
                         HStack(spacing: 0) {
                             NavigationLink {
@@ -295,15 +293,14 @@ private struct SuggestionsView: View {
                             Button("Track") {
                                 Task { await model.setTracked(true, bill) }
                             }
-                            .buttonStyle(ChipButtonStyle())
+                            .buttonStyle(PillButtonStyle())
                             .disabled(model.changing.contains(bill.id))
                             .accessibilityLabel("Track \(bill.title)")
                             .padding(.trailing, 12)
                         }
                     }
                 }
-                .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
-                .clipShape(.rect(cornerRadius: Theme.cardRadius))
+                .rowGroup()
             }
             .padding(.horizontal, Theme.margin)
             .padding(.bottom, Theme.bottomRoom)
@@ -315,34 +312,10 @@ private struct SuggestionsView: View {
     }
 }
 
-/// A small grey pill for an action inside a row.
-private struct ChipButtonStyle: ButtonStyle {
-    @Environment(\.isEnabled) private var isEnabled
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(Theme.smallStrong)
-            .foregroundStyle(Theme.text)
-            .padding(.horizontal, 14)
-            .frame(minHeight: 36)
-            .background(Theme.raised, in: .capsule)
-            .frame(minHeight: 44)
-            .contentShape(.rect)
-            .opacity(isEnabled ? (configuration.isPressed ? 0.6 : 1) : 0.35)
-    }
-}
-
 private extension View {
     /// Says why a change to a bill did not go through.
     func billActionAlert(_ model: BillsModel) -> some View {
-        alert(
-            "That did not work",
-            isPresented: Binding(get: { model.actionError != nil }, set: { if !$0 { model.actionError = nil } })
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(model.actionError ?? "")
-        }
+        errorSheet(Binding(get: { model.actionError }, set: { model.actionError = $0 }))
     }
 }
 
@@ -358,7 +331,7 @@ struct BillRows: View {
         VStack(spacing: 0) {
             ForEach(Array(statuses.enumerated()), id: \.element.id) { index, status in
                 if index > 0 {
-                    RowRule().padding(.leading, 68)
+                    RowRule(inset: .tile)
                 }
                 NavigationLink {
                     BillDetailView(client: client, model: model, bill: status.bill, status: status)
@@ -368,8 +341,7 @@ struct BillRows: View {
                 .buttonStyle(RowButtonStyle())
             }
         }
-        .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
-        .clipShape(.rect(cornerRadius: Theme.cardRadius))
+        .rowGroup()
     }
 }
 
@@ -560,7 +532,7 @@ struct BillDetailView: View {
                             LinkRow(title: "This month's payment")
                         }
                         .buttonStyle(RowButtonStyle())
-                        RowRule().padding(.leading, 16)
+                        RowRule(inset: .text)
                     }
                     NavigationLink {
                         TransactionsView(client: client, title: bill.title, filter: history)
@@ -569,24 +541,19 @@ struct BillDetailView: View {
                     }
                     .buttonStyle(RowButtonStyle())
                 }
-                .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
-                .clipShape(.rect(cornerRadius: Theme.cardRadius))
+                .rowGroup()
 
                 if bill.isSuggestion {
-                    Button(isChanging ? "Tracking…" : "Track this bill") {
+                    WorkingButton(title: "Track this bill", workingTitle: "Tracking…", isWorking: isChanging) {
                         Task {
                             if await model.setTracked(true, bill) { dismiss() }
                         }
                     }
-                    .buttonStyle(PrimaryButtonStyle(fullWidth: true))
-                    .disabled(isChanging)
                 } else if bill.isActive {
                     Button(isChanging ? "Stopping…" : "Stop tracking") {
                         confirmingStop = true
                     }
-                    .font(Theme.bodyStrong)
-                    .foregroundStyle(Theme.negative)
-                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .buttonStyle(TextButtonStyle(isDestructive: true, fullWidth: true))
                     .disabled(isChanging)
                 }
             }

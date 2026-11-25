@@ -59,6 +59,15 @@ enum Theme {
     static let small = font(14, .regular, relativeTo: .subheadline)
     static let smallStrong = font(14, .semibold, relativeTo: .subheadline)
 
+    // MARK: Icons
+
+    /// Chevrons and other small marks beside text.
+    static let glyphSmall = Font.system(size: 12, weight: .semibold)
+    /// An icon in a button, a tile or a field.
+    static let glyph = Font.system(size: 17, weight: .medium)
+    /// The round mark of a choice that can be picked.
+    static let glyphLarge = Font.system(size: 22)
+
     /// Applies Manrope to the navigation and tab bars, which SwiftUI does not
     /// reach through the environment.
     static func applyBarAppearance() {

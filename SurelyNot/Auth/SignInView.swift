@@ -135,13 +135,11 @@ struct SignInView: View {
             .background(Theme.surface, in: .rect(cornerRadius: Theme.controlRadius))
 
             if server.url.scheme?.lowercased() == "http" {
-                Label(
+                Notice(
                     "This address is not encrypted. Your password and finances travel in plain text, so only use it on a network you trust.",
-                    systemImage: "lock.open.fill"
+                    kind: .warning,
+                    symbol: "lock.open.fill"
                 )
-                .font(Theme.small)
-                .foregroundStyle(Theme.negative)
-                .fixedSize(horizontal: false, vertical: true)
             }
 
             switch method {
@@ -251,9 +249,7 @@ struct SignInView: View {
     @ViewBuilder
     private var message: some View {
         if let text = errorMessage ?? session.notice {
-            Label(text, systemImage: "exclamationmark.circle.fill")
-                .font(Theme.small)
-                .foregroundStyle(Theme.negative)
+            Notice(text)
                 .transition(.opacity)
         }
     }
@@ -420,27 +416,5 @@ private struct Field<Content: View>: View {
                     .foregroundStyle(Theme.muted)
             }
         }
-    }
-}
-
-/// The main button of a step. It stays solid while idle and shows a spinner
-/// and a new label while its step is running.
-private struct WorkingButton: View {
-    let title: String
-    let workingTitle: String
-    let isWorking: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                if isWorking {
-                    ProgressView().tint(Theme.onPrimary)
-                }
-                Text(isWorking ? workingTitle : title)
-            }
-        }
-        .buttonStyle(PrimaryButtonStyle(fullWidth: true))
-        .allowsHitTesting(!isWorking)
     }
 }

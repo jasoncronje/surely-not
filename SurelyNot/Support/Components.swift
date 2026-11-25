@@ -14,20 +14,78 @@ struct LoadableView<Value, Content: View>: View {
         case .loading:
             LoadingLines(count: placeholderLines)
         case .failed(let message):
-            VStack(alignment: .leading, spacing: 8) {
-                Text(message)
-                    .font(Theme.small)
-                    .foregroundStyle(Theme.muted)
+            FailureNote(message: message, retry: retry)
+        case .loaded(let value):
+            content(value)
+        }
+    }
+}
+
+/// Says something did not load, with a way to ask again. Sits inside the
+/// block that failed.
+struct FailureNote: View {
+    let message: String
+    var retry: (() async -> Void)?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(message)
+                .font(Theme.small)
+                .foregroundStyle(Theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            if let retry {
                 Button("Try again") {
                     Task { await retry() }
                 }
                 .font(Theme.smallStrong)
                 .foregroundStyle(Theme.text)
+                .frame(minHeight: 44)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        case .loaded(let value):
-            content(value)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// A short line that something went wrong, or needs care, with an icon in
+/// front. Red is for what failed. Amber is for a caution that is not an error.
+struct Notice: View {
+    enum Kind {
+        case error, warning
+
+        var color: Color { self == .error ? Theme.negative : Theme.warning }
+        var symbol: String { self == .error ? "exclamationmark.circle.fill" : "exclamationmark.triangle.fill" }
+    }
+
+    let text: String
+    var kind = Kind.error
+    /// Replaces the kind's own icon.
+    var symbol: String?
+    var retry: (() async -> Void)?
+
+    init(_ text: String, kind: Kind = .error, symbol: String? = nil, retry: (() async -> Void)? = nil) {
+        self.text = text
+        self.kind = kind
+        self.symbol = symbol
+        self.retry = retry
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label(text, systemImage: symbol ?? kind.symbol)
+                .font(Theme.small)
+                .foregroundStyle(kind.color)
+                .fixedSize(horizontal: false, vertical: true)
+            if let retry {
+                Button("Try again") {
+                    Task { await retry() }
+                }
+                .font(Theme.smallStrong)
+                .foregroundStyle(Theme.text)
+                .frame(minHeight: 44)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 4)
     }
 }
 
@@ -64,8 +122,7 @@ struct Card<Content: View>: View {
             content
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(Theme.cardPadding)
-        .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
+        .cardSurface()
     }
 }
 
@@ -193,10 +250,72 @@ struct FigureRow: View {
 
 /// A hairline between rows inside a card.
 struct RowRule: View {
+    /// Where the line starts, so it lines up with the text of the rows.
+    enum Inset: CGFloat {
+        /// Full width, for rows in a padded card.
+        case none = 0
+        /// Rows whose text starts at the edge padding.
+        case text = 16
+        /// Rows that lead with a 40pt tile or icon.
+        case tile = 68
+    }
+
+    var inset = Inset.none
+
     var body: some View {
         Rectangle()
             .fill(Theme.rule)
             .frame(height: 1)
+            .padding(.leading, inset.rawValue)
+    }
+}
+
+/// A chevron at the end of a row that opens another screen.
+struct DisclosureChevron: View {
+    var body: some View {
+        Image(systemName: "chevron.right")
+            .font(Theme.glyphSmall)
+            .foregroundStyle(Theme.muted)
+            .accessibilityHidden(true)
+    }
+}
+
+/// A row in a list of choices where one is picked: a title, a line under it,
+/// and a round mark that fills in when chosen.
+struct ChoiceRow: View {
+    let title: String
+    var detail: String?
+    let isOn: Bool
+    /// Space around the row's content.
+    var padding: EdgeInsets = EdgeInsets(top: 12, leading: 0, bottom: 12, trailing: 0)
+    let select: () -> Void
+
+    var body: some View {
+        Button(action: select) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(Theme.body)
+                        .foregroundStyle(Theme.text)
+                    if let detail {
+                        Text(detail)
+                            .font(Theme.small)
+                            .foregroundStyle(Theme.muted)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                Spacer(minLength: 8)
+                Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
+                    .font(Theme.glyphLarge)
+                    .foregroundStyle(isOn ? Theme.text : Theme.control)
+                    .accessibilityHidden(true)
+            }
+            .padding(padding)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }
 
@@ -264,18 +383,111 @@ struct PrimaryButtonStyle: ButtonStyle {
     }
 }
 
-/// A round grey button holding one icon.
+/// A round button holding one icon: white, or near-black when it is the
+/// screen's main action, such as Send.
 struct IconButtonStyle: ButtonStyle {
+    var isProminent = false
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .labelStyle(.iconOnly)
-            .font(.system(size: 17, weight: .medium))
-            .foregroundStyle(Theme.text)
+            .font(Theme.glyph)
+            .foregroundStyle(isProminent ? Theme.onPrimary : Theme.text)
             .frame(width: 44, height: 44)
-            .background(Theme.surface, in: .circle)
+            .background(isProminent ? Theme.primary : Theme.surface, in: .circle)
             .opacity(isEnabled ? (configuration.isPressed ? 0.6 : 1) : 0.35)
+    }
+}
+
+/// A button that is only its words: for Cancel, and for actions that sit
+/// quietly under a card. Red when it removes or stops something.
+struct TextButtonStyle: ButtonStyle {
+    var isDestructive = false
+    var fullWidth = false
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(Theme.bodyStrong)
+            .foregroundStyle(isDestructive ? Theme.negative : Theme.text)
+            .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: 48, alignment: fullWidth ? .center : .leading)
+            .contentShape(.rect)
+            .opacity(isEnabled ? (configuration.isPressed ? 0.6 : 1) : 0.35)
+    }
+}
+
+/// A small grey pill for an action inside a row, such as Track.
+struct PillButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(Theme.smallStrong)
+            .foregroundStyle(Theme.text)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 36)
+            .background(Theme.raised, in: .capsule)
+            .frame(minHeight: 44)
+            .contentShape(.rect)
+            .opacity(isEnabled ? (configuration.isPressed ? 0.6 : 1) : 0.35)
+    }
+}
+
+/// Dims a row while it is pressed.
+struct RowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(configuration.isPressed ? Theme.raised : Color.clear)
+    }
+}
+
+/// The main button of a step that takes a moment. It stays solid while
+/// idle, and shows a spinner and a new label while the work runs.
+struct WorkingButton: View {
+    let title: String
+    let workingTitle: String
+    let isWorking: Bool
+    var isDestructive = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                if isWorking {
+                    ProgressView().tint(isDestructive ? Color.white : Theme.onPrimary)
+                }
+                Text(isWorking ? workingTitle : title)
+            }
+        }
+        .buttonStyle(PrimaryButtonStyle(fullWidth: true, isDestructive: isDestructive))
+        .allowsHitTesting(!isWorking)
+    }
+}
+
+/// The label of a menu that picks a value: a pill with the current choice
+/// and a chevron. Dark while it narrows what is shown. Use `onCard` when it
+/// sits on a white card, where it takes the grey fill instead.
+struct MenuChip: View {
+    let text: String
+    var isActive = false
+    var onCard = false
+    var symbol = "chevron.down"
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(text)
+                .font(Theme.smallStrong)
+                .lineLimit(1)
+            Image(systemName: symbol)
+                .font(Theme.glyphSmall)
+        }
+        .foregroundStyle(isActive ? Theme.onPrimary : Theme.text)
+        .padding(.horizontal, 14)
+        .frame(minHeight: 36)
+        .background(isActive ? Theme.primary : (onCard ? Theme.raised : Theme.surface), in: .capsule)
+        .frame(minHeight: 44)
+        .contentShape(.rect)
     }
 }
 
@@ -291,18 +503,14 @@ struct EmptyNote: View {
     }
 }
 
-/// Asks before something that is hard to take back: a title, a line on what
-/// happens, optional choices, then the action and Cancel. The app's own sheet,
-/// sized to fit, used instead of the system's confirmation dialog.
-struct ConfirmSheet<Options: View>: View {
+/// The frame every small sheet in the app shares: a title, a line under it,
+/// optional content, then its buttons. Sized to fit, on the page background.
+struct SheetFrame<Content: View, Actions: View>: View {
     let title: String
     var message: String?
-    let confirmTitle: String
-    var isDestructive = true
-    let confirm: () -> Void
-    @ViewBuilder var options: Options
+    @ViewBuilder var content: Content
+    @ViewBuilder var actions: Actions
 
-    @Environment(\.dismiss) private var dismiss
     @State private var height: CGFloat = 300
 
     var body: some View {
@@ -313,28 +521,17 @@ struct ConfirmSheet<Options: View>: View {
                     .foregroundStyle(Theme.text)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
-                if let message {
+                if let message, !message.isEmpty {
                     Text(message)
                         .font(Theme.body)
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-
-            options
-
+            content
             VStack(spacing: 4) {
-                Button(confirmTitle) {
-                    dismiss()
-                    confirm()
-                }
-                .buttonStyle(PrimaryButtonStyle(fullWidth: true, isDestructive: isDestructive))
-                Button("Cancel") { dismiss() }
-                    .font(Theme.bodyStrong)
-                    .foregroundStyle(Theme.text)
-                    .frame(maxWidth: .infinity, minHeight: 48)
+                actions
             }
-            .animation(.snappy(duration: 0.2), value: isDestructive)
         }
         .padding(.horizontal, 20)
         .padding(.top, 28)
@@ -344,6 +541,35 @@ struct ConfirmSheet<Options: View>: View {
         .presentationDragIndicator(.visible)
         .presentationBackground(Theme.ground)
         .presentationCornerRadius(32)
+    }
+}
+
+/// Asks before something that is hard to take back: a title, a line on what
+/// happens, optional choices, then the action and Cancel. Used everywhere
+/// instead of the system's confirmation dialog.
+struct ConfirmSheet<Options: View>: View {
+    let title: String
+    var message: String?
+    let confirmTitle: String
+    var isDestructive = true
+    let confirm: () -> Void
+    @ViewBuilder var options: Options
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        SheetFrame(title: title, message: message) {
+            options
+        } actions: {
+            Button(confirmTitle) {
+                dismiss()
+                confirm()
+            }
+            .buttonStyle(PrimaryButtonStyle(fullWidth: true, isDestructive: isDestructive))
+            .animation(.snappy(duration: 0.2), value: isDestructive)
+            Button("Cancel") { dismiss() }
+                .buttonStyle(TextButtonStyle(fullWidth: true))
+        }
     }
 }
 
@@ -365,6 +591,30 @@ extension ConfirmSheet where Options == EmptyView {
     }
 }
 
+/// Tells the person something they need to read, such as why an action did
+/// not go through, with one button to close it. Used instead of system alerts.
+struct MessageSheet: View {
+    let title: String
+    let message: String
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        SheetFrame(title: title, message: message) {
+            EmptyView()
+        } actions: {
+            Button("OK") { dismiss() }
+                .buttonStyle(PrimaryButtonStyle(fullWidth: true))
+        }
+    }
+}
+
+/// A message held while its sheet is up, so the text stays put as it closes.
+private struct ShownMessage: Identifiable {
+    let text: String
+    var id: String { text }
+}
+
 extension View {
     /// Shows a `ConfirmSheet` while `isPresented` is true.
     func confirmSheet(
@@ -384,6 +634,37 @@ extension View {
                 confirm: confirm
             )
         }
+    }
+
+    /// Shows a `MessageSheet` while `isPresented` is true.
+    func messageSheet(_ title: String, isPresented: Binding<Bool>, message: String) -> some View {
+        sheet(isPresented: isPresented) {
+            MessageSheet(title: title, message: message)
+        }
+    }
+
+    /// Shows why something failed in a `MessageSheet`, while `error` holds
+    /// text. Closing it clears the error.
+    func errorSheet(_ error: Binding<String?>, title: String = "That did not work") -> some View {
+        sheet(item: Binding(
+            get: { error.wrappedValue.flatMap { $0.isEmpty ? nil : ShownMessage(text: $0) } },
+            set: { if $0 == nil { error.wrappedValue = nil } }
+        )) { shown in
+            MessageSheet(title: title, message: shown.text)
+        }
+    }
+
+    /// A white panel holding rows edge to edge, with the card corner radius.
+    func rowGroup() -> some View {
+        background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
+            .clipShape(.rect(cornerRadius: Theme.cardRadius))
+    }
+
+    /// The padded white panel of a card, for content that is not a `Card`,
+    /// such as a whole card that is one link.
+    func cardSurface() -> some View {
+        padding(Theme.cardPadding)
+            .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
     }
 
     /// The page background and default type for a screen.

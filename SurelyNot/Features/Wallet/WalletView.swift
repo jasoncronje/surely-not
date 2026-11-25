@@ -121,19 +121,10 @@ struct WalletView: View {
                     value: "\(link.outbox.count) \(link.outbox.count == 1 ? "batch" : "batches")"
                 )
             }
-            if wallet.isWorking {
-                HStack(spacing: 10) {
-                    ProgressView()
-                    Text(wallet.activity ?? "Working")
-                        .font(Theme.body)
-                        .foregroundStyle(Theme.muted)
-                }
-                .frame(maxWidth: .infinity, minHeight: 52)
-            } else if wallet.repairNeeded == nil {
-                Button("Sync now") {
+            if wallet.isWorking || wallet.repairNeeded == nil {
+                WorkingButton(title: "Sync now", workingTitle: wallet.activity ?? "Working", isWorking: wallet.isWorking) {
                     Task { await wallet.sync() }
                 }
-                .buttonStyle(PrimaryButtonStyle(fullWidth: true))
             }
             Text("Wallet syncs when you open the app and when you tap Sync now, not while the app is closed.")
                 .font(Theme.small)
@@ -170,12 +161,9 @@ struct WalletView: View {
                             .multilineTextAlignment(.leading)
                     }
                     Spacer(minLength: 8)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Theme.muted)
+                    DisclosureChevron()
                 }
-                .padding(Theme.cardPadding)
-                .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
+                .cardSurface()
             }
             .buttonStyle(.plain)
         }
@@ -197,8 +185,7 @@ struct WalletView: View {
                 Button("Disconnect Apple Wallet") {
                     isConfirmingDisconnect = true
                 }
-                .font(Theme.bodyStrong)
-                .foregroundStyle(Theme.negative)
+                .buttonStyle(TextButtonStyle(isDestructive: true))
                 .disabled(wallet.isWorking)
                 Text("Sure stops getting new activity. You choose whether to keep what it already has.")
                     .font(Theme.small)
@@ -210,10 +197,7 @@ struct WalletView: View {
     @ViewBuilder
     private var problemNote: some View {
         if let problem = wallet.problem, !wallet.isWorking {
-            Text(problem)
-                .font(Theme.small)
-                .foregroundStyle(Theme.negative)
-                .padding(.horizontal, 4)
+            Notice(problem)
         }
     }
 
@@ -240,47 +224,23 @@ struct WalletDisconnectSheet: View {
         } options: {
             if wallet.serverCanDiscard {
                 VStack(spacing: 0) {
-                    choice(
-                        "Keep what was imported",
+                    ChoiceRow(
+                        title: "Keep what was imported",
                         detail: "The accounts and transactions stay in Sure.",
-                        isOn: !removing
+                        isOn: !removing,
+                        padding: EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16)
                     ) { removing = false }
                     RowRule().padding(.horizontal, 16)
-                    choice(
-                        "Remove what was imported",
+                    ChoiceRow(
+                        title: "Remove what was imported",
                         detail: "Sure deletes the accounts and transactions Wallet sent. This cannot be undone.",
-                        isOn: removing
+                        isOn: removing,
+                        padding: EdgeInsets(top: 16, leading: 16, bottom: 16, trailing: 16)
                     ) { removing = true }
                 }
-                .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
+                .rowGroup()
             }
         }
-    }
-
-    private func choice(_ title: String, detail: String, isOn: Bool, select: @escaping () -> Void) -> some View {
-        Button(action: select) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(Theme.body)
-                        .foregroundStyle(Theme.text)
-                    Text(detail)
-                        .font(Theme.small)
-                        .foregroundStyle(Theme.muted)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 8)
-                Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 22))
-                    .foregroundStyle(isOn ? Theme.text : Theme.control)
-                    .accessibilityHidden(true)
-            }
-            .padding(16)
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }
 
@@ -290,7 +250,7 @@ struct WalletAccountIcon: View {
 
     var body: some View {
         Image(systemName: isLiability ? "creditcard" : "banknote")
-            .font(.system(size: 16, weight: .medium))
+            .font(Theme.glyph)
             .foregroundStyle(Theme.text)
             .frame(width: 40, height: 40)
             .background(Theme.raised, in: .circle)
@@ -314,7 +274,7 @@ struct WalletEntryRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: "wallet.pass")
-                .font(.system(size: 17, weight: .medium))
+                .font(Theme.glyph)
                 .foregroundStyle(Theme.muted)
                 .frame(width: 40, height: 40)
                 .background(Theme.raised, in: .circle)
@@ -329,13 +289,11 @@ struct WalletEntryRow: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
-            Image(systemName: "chevron.right")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Theme.muted)
+            DisclosureChevron()
         }
         .padding(.horizontal, 16)
         .frame(minHeight: 68)
-        .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
+        .rowGroup()
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
     }
@@ -490,17 +448,7 @@ struct WalletSetupView: View {
                             }
                         }
                     } label: {
-                        HStack(spacing: 4) {
-                            Text(targetName(account, kind: kind))
-                                .lineLimit(1)
-                            Image(systemName: "chevron.up.chevron.down")
-                                .font(.system(size: 11, weight: .semibold))
-                        }
-                        .font(Theme.smallStrong)
-                        .foregroundStyle(Theme.text)
-                        .padding(.horizontal, 12)
-                        .frame(minHeight: 32)
-                        .background(Theme.raised, in: .capsule)
+                        MenuChip(text: targetName(account, kind: kind), onCard: true)
                     }
                     .accessibilityLabel("Goes into \(targetName(account, kind: kind))")
                 }
@@ -528,30 +476,9 @@ struct WalletSetupView: View {
                     if index > 0 {
                         RowRule()
                     }
-                    Button {
+                    ChoiceRow(title: choice.rawValue, detail: choice.detail, isOn: history == choice) {
                         history = choice
-                    } label: {
-                        HStack(alignment: .top, spacing: 12) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(choice.rawValue)
-                                    .font(Theme.body)
-                                    .foregroundStyle(Theme.text)
-                                Text(choice.detail)
-                                    .font(Theme.small)
-                                    .foregroundStyle(Theme.muted)
-                                    .multilineTextAlignment(.leading)
-                            }
-                            Spacer(minLength: 8)
-                            Image(systemName: history == choice ? "checkmark.circle.fill" : "circle")
-                                .font(.system(size: 22))
-                                .foregroundStyle(history == choice ? Theme.text : Theme.control)
-                                .accessibilityHidden(true)
-                        }
-                        .padding(.vertical, 12)
-                        .contentShape(.rect)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(history == choice ? .isSelected : [])
                 }
             }
             .padding(.vertical, -12)
@@ -587,26 +514,16 @@ struct WalletSetupView: View {
     private func connectBar(_ accounts: [WalletAccount]) -> some View {
         VStack(spacing: 10) {
             if let problem = wallet.problem, !wallet.isWorking {
-                Text(problem)
-                    .font(Theme.small)
-                    .foregroundStyle(Theme.negative)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                Notice(problem)
             }
-            if wallet.isWorking {
-                HStack(spacing: 10) {
-                    ProgressView()
-                    Text(wallet.activity ?? "Working")
-                        .font(Theme.body)
-                        .foregroundStyle(Theme.muted)
-                }
-                .frame(maxWidth: .infinity, minHeight: 52)
-            } else {
-                Button(selected.isEmpty ? "Choose an account" : "Agree and connect") {
-                    Task { await connect(accounts) }
-                }
-                .buttonStyle(PrimaryButtonStyle(fullWidth: true))
-                .disabled(selected.isEmpty)
+            WorkingButton(
+                title: selected.isEmpty ? "Choose an account" : "Agree and connect",
+                workingTitle: wallet.activity ?? "Working",
+                isWorking: wallet.isWorking
+            ) {
+                Task { await connect(accounts) }
             }
+            .disabled(selected.isEmpty && !wallet.isWorking)
         }
         .padding(.horizontal, Theme.margin)
         .padding(.top, 12)
@@ -682,10 +599,7 @@ struct WalletReviewView: View {
                     }
                 }
                 if let problem = wallet.problem, !wallet.isWorking {
-                    Text(problem)
-                        .font(Theme.small)
-                        .foregroundStyle(Theme.negative)
-                        .padding(.horizontal, 4)
+                    Notice(problem)
                 }
             }
             .padding(.horizontal, Theme.margin)

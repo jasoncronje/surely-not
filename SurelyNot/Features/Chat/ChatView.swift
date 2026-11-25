@@ -233,14 +233,7 @@ struct ChatView: View {
                     }
                 } else if let error = model.loadError {
                     Card {
-                        Text("Could not load this chat. \(error)")
-                            .font(Theme.small)
-                            .foregroundStyle(Theme.muted)
-                        Button("Try again") {
-                            Task { await model.load() }
-                        }
-                        .font(Theme.smallStrong)
-                        .foregroundStyle(Theme.text)
+                        FailureNote(message: "Could not load this chat. \(error)") { await model.load() }
                     }
                 } else if model.bubbles.isEmpty {
                     starterList
@@ -260,19 +253,11 @@ struct ChatView: View {
                     ThinkingIndicator()
                 }
                 if let error = model.replyError {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(error)
-                            .font(Theme.small)
-                            .foregroundStyle(Theme.negative)
-                        if model.canRetry {
-                            Button("Try again") {
-                                Task { await model.retry() }
-                            }
-                            .font(Theme.smallStrong)
-                            .foregroundStyle(Theme.text)
-                        }
+                    if model.canRetry {
+                        Notice(error) { await model.retry() }
+                    } else {
+                        Notice(error)
                     }
-                    .padding(.horizontal, 4)
                 }
             }
             .padding(.horizontal, Theme.margin)
@@ -301,7 +286,7 @@ struct ChatView: View {
             VStack(spacing: 0) {
                 ForEach(Array(Self.starters.enumerated()), id: \.offset) { index, starter in
                     if index > 0 {
-                        RowRule().padding(.leading, 16)
+                        RowRule(inset: .text)
                     }
                     Button {
                         send(starter)
@@ -317,8 +302,7 @@ struct ChatView: View {
                     .buttonStyle(RowButtonStyle())
                 }
             }
-            .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
-            .clipShape(.rect(cornerRadius: Theme.cardRadius))
+            .rowGroup()
         }
     }
 
@@ -340,18 +324,11 @@ struct ChatView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
                 .background(Theme.surface, in: .rect(cornerRadius: 22))
-            Button {
+            Button("Send", systemImage: "arrow.up") {
                 send(draft)
-            } label: {
-                Image(systemName: "arrow.up")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Theme.onPrimary)
-                    .frame(width: 44, height: 44)
-                    .background(Theme.primary, in: .circle)
             }
-            .accessibilityLabel("Send")
+            .buttonStyle(IconButtonStyle(isProminent: true))
             .disabled(!canSend)
-            .opacity(canSend ? 1 : 0.35)
         }
         .padding(.horizontal, Theme.margin)
         .padding(.vertical, 8)

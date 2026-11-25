@@ -145,8 +145,7 @@ struct TransactionEditor: View {
 
                 if let errorMessage {
                     Section {
-                        Label(errorMessage, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.red)
+                        Notice(errorMessage)
                     }
                 }
 

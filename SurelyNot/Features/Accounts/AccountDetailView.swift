@@ -151,14 +151,7 @@ struct AccountDetailView: View {
 
                 if let error = model.transactionsError {
                     Card {
-                        Text(error)
-                            .font(Theme.small)
-                            .foregroundStyle(Theme.muted)
-                        Button("Try again") {
-                            Task { await model.reloadTransactions() }
-                        }
-                        .font(Theme.smallStrong)
-                        .foregroundStyle(Theme.text)
+                        FailureNote(message: error) { await model.reloadTransactions() }
                     }
                 } else if model.transactions.isEmpty, !model.isLoadingTransactions {
                     Card {

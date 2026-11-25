@@ -138,11 +138,7 @@ struct OverviewView: View {
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
             }
-            .alert("That did not work", isPresented: actionErrorShown) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(model.actionError ?? "")
-            }
+            .errorSheet(Binding(get: { model.actionError }, set: { model.actionError = $0 }))
             .refreshable { await model.load() }
             .task { await model.load() }
             .onChange(of: changes.version) {
@@ -172,7 +168,7 @@ struct OverviewView: View {
                 VStack(spacing: 0) {
                     ForEach(Array(transactions.enumerated()), id: \.element.id) { index, transaction in
                         if index > 0 {
-                            RowRule().padding(.leading, 68)
+                            RowRule(inset: .tile)
                         }
                         NavigationLink {
                             TransactionDetailView(client: client, transaction: transaction)
@@ -183,8 +179,7 @@ struct OverviewView: View {
                         .categoryContextMenu(for: transaction)
                     }
                 }
-                .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
-                .clipShape(.rect(cornerRadius: Theme.cardRadius))
+                .rowGroup()
             default:
                 Card {
                     LoadableView(state: model.recent, placeholderLines: 4, retry: model.loadRecent) { _ in
@@ -218,10 +213,6 @@ struct OverviewView: View {
             }
         }
         .padding(.top, 8)
-    }
-
-    private var actionErrorShown: Binding<Bool> {
-        Binding(get: { model.actionError != nil }, set: { if !$0 { model.actionError = nil } })
     }
 }
 
@@ -569,9 +560,7 @@ struct CategoryPaceRow: View {
                             .monospacedDigit()
                             .foregroundStyle(Theme.text)
                         if showsChevron {
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(Theme.muted)
+                            DisclosureChevron()
                         }
                     }
                 }

@@ -231,7 +231,7 @@ struct TransactionsView: View {
                         }
                     }
                 } label: {
-                    FilterChip(text: filter.period.label, isActive: filter.period != .allTime)
+                    MenuChip(text: filter.period.label, isActive: filter.period != .allTime)
                 }
                 Menu {
                     Picker("Type", selection: $filter.kind) {
@@ -240,7 +240,7 @@ struct TransactionsView: View {
                         }
                     }
                 } label: {
-                    FilterChip(text: filter.kind.label, isActive: filter.kind != .all)
+                    MenuChip(text: filter.kind.label, isActive: filter.kind != .all)
                 }
                 Menu {
                     Picker("Account", selection: $filter.account) {
@@ -250,7 +250,7 @@ struct TransactionsView: View {
                         }
                     }
                 } label: {
-                    FilterChip(text: filter.account?.name ?? "All accounts", isActive: filter.account != nil)
+                    MenuChip(text: filter.account?.name ?? "All accounts", isActive: filter.account != nil)
                 }
                 Menu {
                     Picker("Category", selection: $filter.category) {
@@ -260,13 +260,13 @@ struct TransactionsView: View {
                         }
                     }
                 } label: {
-                    FilterChip(text: filter.category?.name ?? "All categories", isActive: filter.category != nil)
+                    MenuChip(text: filter.category?.name ?? "All categories", isActive: filter.category != nil)
                 }
                 if let merchant = filter.merchant {
                     Button {
                         filter.merchant = nil
                     } label: {
-                        FilterChip(text: merchant.name, isActive: true, symbol: "xmark")
+                        MenuChip(text: merchant.name, isActive: true, symbol: "xmark")
                     }
                     .accessibilityLabel("Stop filtering by \(merchant.name)")
                 }
@@ -323,14 +323,7 @@ struct TransactionsView: View {
     private var status: some View {
         if let error = model.error {
             Card {
-                Text(error)
-                    .font(Theme.small)
-                    .foregroundStyle(Theme.muted)
-                Button("Try again") {
-                    Task { await model.reload() }
-                }
-                .font(Theme.smallStrong)
-                .foregroundStyle(Theme.text)
+                FailureNote(message: error) { await model.reload() }
             }
         } else if !model.hasLoaded {
             Card {
@@ -354,7 +347,7 @@ private struct SearchField: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 16, weight: .medium))
+                .font(Theme.glyph)
                 .foregroundStyle(Theme.muted)
             TextField("Search name, merchant or note", text: $text)
                 .font(Theme.body)
@@ -378,28 +371,6 @@ private struct SearchField: View {
         .background(Theme.surface, in: .rect(cornerRadius: Theme.controlRadius))
         .contentShape(.rect)
         .onTapGesture { isFocused = true }
-    }
-}
-
-/// One filter in the bar. Dark when it is narrowing the list.
-private struct FilterChip: View {
-    let text: String
-    let isActive: Bool
-    var symbol = "chevron.down"
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Text(text)
-                .font(Theme.smallStrong)
-                .lineLimit(1)
-            Image(systemName: symbol)
-                .font(.system(size: 11, weight: .semibold))
-        }
-        .foregroundStyle(isActive ? Theme.onPrimary : Theme.text)
-        .padding(.horizontal, 14)
-        .frame(minHeight: 40)
-        .background(isActive ? Theme.primary : Theme.surface, in: .capsule)
-        .contentShape(.capsule)
     }
 }
 
@@ -471,7 +442,7 @@ struct TransactionDayList<Destination: View>: View {
                 VStack(spacing: 0) {
                     ForEach(Array(day.transactions.enumerated()), id: \.element.id) { index, transaction in
                         if index > 0 {
-                            RowRule().padding(.leading, 68)
+                            RowRule(inset: .tile)
                         }
                         NavigationLink {
                             destination(transaction)
@@ -482,8 +453,7 @@ struct TransactionDayList<Destination: View>: View {
                         .categoryContextMenu(for: transaction)
                     }
                 }
-                .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
-                .clipShape(.rect(cornerRadius: Theme.cardRadius))
+                .rowGroup()
             }
         }
     }
