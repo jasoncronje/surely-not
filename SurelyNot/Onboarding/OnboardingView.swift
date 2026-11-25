@@ -37,17 +37,32 @@ struct WelcomeView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shown = false
 
+    static let sureProject = URL(string: "https://github.com/we-promise/sure")!
+
+    /// The pitch, with "Sure" linking to the project for anyone new to it.
+    private static var pitch: AttributedString {
+        var text = AttributedString("An iPhone app for ")
+        var sure = AttributedString("Sure")
+        sure.link = sureProject
+        sure.underlineStyle = .single
+        sure.foregroundColor = Theme.text
+        text += sure
+        text += AttributedString(", the open source finance app you host yourself. Your money stays on your server.")
+        return text
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 18) {
                 ProductMark(size: 44)
-                Text("Your Sure,\nin your pocket.")
+                Text("Your money,\nin your pocket.")
                     .font(Theme.font(34, .bold, relativeTo: .largeTitle))
                     .foregroundStyle(Theme.text)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("A native iPhone app for your self-hosted Sure server. Your money stays on your server.")
+                Text(Self.pitch)
                     .font(Theme.body)
                     .foregroundStyle(Theme.muted)
+                    .tint(Theme.text)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.top, 48)
@@ -72,11 +87,20 @@ struct WelcomeView: View {
                         .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
+                Link(destination: Self.sureProject) {
+                    HStack(spacing: 4) {
+                        Text("New to Sure? See the project")
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .font(Theme.smallStrong)
+                    .foregroundStyle(Theme.muted)
+                    .frame(minHeight: 32)
+                }
                 Text("An unofficial app, not affiliated with the Sure project.")
                     .font(Theme.small)
                     .foregroundStyle(Theme.muted)
                     .multilineTextAlignment(.center)
-                    .padding(.top, 4)
             }
             .opacity(shown ? 1 : 0)
         }
