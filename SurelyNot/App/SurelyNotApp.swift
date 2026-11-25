@@ -170,38 +170,78 @@ struct SettingsView: View {
         }
     }
 
-    @ViewBuilder
-    private var serverCheckRow: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Test connection")
+    /// The server, how it last answered, and the way to ask again, as one
+    /// row: the status sits under the name it describes.
+    private var serverRow: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Server")
+                    .font(Theme.small)
+                    .foregroundStyle(Theme.muted)
+                Text(session.serverURL?.host() ?? "Not signed in")
                     .font(Theme.bodyStrong)
                     .foregroundStyle(Theme.text)
-                Group {
-                    switch serverCheck {
-                    case .idle: Text("Checks the server answers and you are still signed in.")
-                    case .checking: Text("Checking…")
-                    case .worked(let ms): Text("Works. Answered in \(ms) ms.")
-                    case .failed(let message): Text(message)
-                    }
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Circle()
+                        .fill(serverDot)
+                        .frame(width: 8, height: 8)
+                        .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
+                    Text(serverStatus)
+                        .font(Theme.small)
+                        .foregroundStyle(serverCheck == .idle ? Theme.muted : Theme.text)
+                        .lineLimit(3)
+                        .contentTransition(.opacity)
                 }
-                .font(Theme.small)
-                .foregroundStyle({
-                    if case .failed = serverCheck { return Theme.negative }
-                    return Theme.muted
-                }())
+                .padding(.top, 2)
             }
+            .accessibilityElement(children: .combine)
             Spacer(minLength: 8)
-            if serverCheck == .checking {
-                ProgressView()
-            } else {
-                Button("Test") {
-                    Task { await testServer() }
+            Button {
+                Task { await testServer() }
+            } label: {
+                ZStack {
+                    Text("Test").opacity(serverCheck == .checking ? 0 : 1)
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(Theme.text)
+                        .opacity(serverCheck == .checking ? 1 : 0)
                 }
                 .font(Theme.smallStrong)
                 .foregroundStyle(Theme.text)
-                .frame(minHeight: 44)
+                .frame(minWidth: 72, minHeight: 36)
+                .background(Theme.raised, in: .capsule)
+                .contentShape(.capsule)
             }
+            .buttonStyle(.plain)
+            .disabled(serverCheck == .checking || session.client == nil)
+            .accessibilityLabel("Test connection")
+        }
+        .animation(.snappy(duration: 0.25), value: serverCheck)
+        .sensoryFeedback(trigger: serverCheck) { _, new in
+            switch new {
+            case .worked: .success
+            case .failed: .error
+            default: nil
+            }
+        }
+    }
+
+    private var serverStatus: String {
+        switch serverCheck {
+        case .idle: "Not checked yet"
+        case .checking: "Checking…"
+        case .worked(let ms): "Connected · \(ms) ms"
+        case .failed(let message): message
+        }
+    }
+
+    private var serverDot: Color {
+        switch serverCheck {
+        case .idle, .checking: Theme.control
+        case .worked: Theme.positive
+        case .failed: Theme.negative
         }
     }
 
@@ -265,9 +305,7 @@ struct SettingsView: View {
                             }
                         }
                         RowRule()
-                        FigureRow(label: "Server", value: session.serverURL?.host() ?? "Not signed in")
-                        RowRule()
-                        serverCheckRow
+                        serverRow
                     }
                     Card {
                         Toggle(isOn: lockIsOn) {
