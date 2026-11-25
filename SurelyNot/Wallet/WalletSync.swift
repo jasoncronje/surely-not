@@ -212,6 +212,8 @@ final class WalletSync {
     private(set) var problem: String?
     /// What the last sync did.
     private(set) var lastOutcome: String?
+    /// What Wallet handed over the last time it was read.
+    private(set) var lastReading: String?
 
     /// Called after Sure has been given new data, so open screens can reload.
     @ObservationIgnored var onImported: (() -> Void)?
@@ -568,6 +570,7 @@ final class WalletSync {
             importSince: link.importSince,
             capturedAt: capturedAt
         )
+        lastReading = plan.readingSummary
         var position = link.position
         let sealed = try WalletSealer.seal(
             events: plan.events,

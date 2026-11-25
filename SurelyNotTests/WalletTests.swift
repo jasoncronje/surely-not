@@ -399,6 +399,26 @@ private nonisolated func balance(_ amount: Decimal, at date: Date = noon.addingT
         #expect(sent == ["new"])
     }
 
+    @Test func aReadingSaysWhatWalletHandedOver() {
+        let changes = WalletTransactionChanges(
+            upserts: [
+                purchase("old", at: noon.addingTimeInterval(-10 * 86_400)),
+                purchase("new"),
+                purchase("wrong-currency", currency: "EUR"),
+            ],
+            deletedIds: ["gone"]
+        )
+        let plan = WalletCapture.plan(
+            accounts: [linked()], reading: reading(transactions: changes, balances: [], inFull: true),
+            importSince: noon.addingTimeInterval(-86_400), capturedAt: noon
+        )
+        #expect(plan.transactionsRead == 3)
+        #expect(plan.olderThanStart == 1)
+        #expect(plan.transactionsQueued == 1)
+        #expect(plan.removed == 1)
+        #expect(plan.readingSummary == "Wallet gave 3 transactions, 1 older than your start date, 1 Sure would refuse, 1 removed.")
+    }
+
     @Test func anAccountThatIsNoLongerSharedIsReportedOnce() {
         var reading = WalletReading()
         reading.accounts = []
@@ -721,6 +741,7 @@ private final class FakeServer: WalletServer {
         #expect(payload["predecessor_digest"] as? String == uploader.sent[0].batch.digest)
         #expect((payload["events"] as? [Any])?.count == 1)
         #expect(wallet.lastOutcome == "Sent 1 record to Sure.")
+        #expect(wallet.lastReading == "Wallet gave 1 transaction.")
     }
 
     @Test func anUploadThatDidNotArriveGoesAgainUnchanged() async throws {

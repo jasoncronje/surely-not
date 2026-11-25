@@ -138,6 +138,23 @@ nonisolated enum WalletCapture {
         var accounts: [WalletLinkedAccount] = []
         /// Records left out because Sure would refuse them.
         var skipped = 0
+        /// Transactions Wallet handed over in this reading.
+        var transactionsRead = 0
+        /// Transactions left out for being older than the chosen start.
+        var olderThanStart = 0
+        /// Transactions queued for Sure.
+        var transactionsQueued = 0
+        /// Transactions Wallet said were removed.
+        var removed = 0
+
+        /// What Wallet handed over, in plain words, for the Wallet screen.
+        var readingSummary: String {
+            var parts = ["Wallet gave \(transactionsRead) \(transactionsRead == 1 ? "transaction" : "transactions")"]
+            if olderThanStart > 0 { parts.append("\(olderThanStart) older than your start date") }
+            if skipped > 0 { parts.append("\(skipped) Sure would refuse") }
+            if removed > 0 { parts.append("\(removed) removed") }
+            return parts.joined(separator: ", ") + "."
+        }
     }
 
     /// Works out what to send to Sure from one reading of Wallet.
@@ -231,14 +248,20 @@ nonisolated enum WalletCapture {
             var seen: Set<String> = []
             for transaction in changes.upserts {
                 guard seen.insert(transaction.id).inserted else { continue }
-                if let importSince, transaction.transactedAt < importSince { continue }
+                plan.transactionsRead += 1
+                if let importSince, transaction.transactedAt < importSince {
+                    plan.olderThanStart += 1
+                    continue
+                }
                 guard let event = self.record(for: transaction, in: account, capturedAt: capturedAt) else {
                     plan.skipped += 1
                     continue
                 }
+                plan.transactionsQueued += 1
                 transactionEvents.append(.transaction(event))
             }
             for id in changes.deletedIds where seen.insert(id).inserted {
+                plan.removed += 1
                 tombstoneEvents.append(.tombstone(WalletEvent.TombstoneRecord(
                     sourceId: id,
                     sourceAccountId: account.sourceId,

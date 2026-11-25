@@ -133,6 +133,11 @@ struct WalletView: View {
                 Text(outcome)
                     .font(Theme.small)
                     .foregroundStyle(Theme.muted)
+                if let reading = wallet.lastReading {
+                    Text(reading)
+                        .font(Theme.small)
+                        .foregroundStyle(Theme.muted)
+                }
             }
         }
 

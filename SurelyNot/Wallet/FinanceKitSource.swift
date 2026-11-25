@@ -98,6 +98,22 @@ nonisolated struct FinanceKitSource: WalletSource {
             throw WalletSourceError.historyExpired
         }
 
+        // Reading from the start, also ask Wallet for the account's
+        // transactions outright. On the first real Apple Card the history
+        // gave removals but none of the transactions themselves, so this
+        // makes sure a first reading holds everything Wallet has.
+        if since == nil {
+            let query = TransactionQuery(
+                sortDescriptors: [SortDescriptor(\.transactionDate)],
+                predicate: #Predicate<FinanceKit.Transaction> { $0.accountID == accountID }
+            )
+            for transaction in try await FinanceStore.shared.transactions(query: query)
+            where latest[transaction.id] == nil && !deleted.contains(transaction.id) {
+                latest[transaction.id] = transaction
+                order.append(transaction.id)
+            }
+        }
+
         return WalletTransactionChanges(
             upserts: order.compactMap { latest[$0] }.map(Self.transaction),
             deletedIds: deleted.map(WalletWire.id).sorted(),
