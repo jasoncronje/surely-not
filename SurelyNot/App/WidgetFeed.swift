@@ -5,6 +5,8 @@ import WidgetKit
 enum WidgetFeed {
     /// The name of the background refresh, as listed in Info.plist.
     nonisolated static let refreshTask = "io.cronje.surelynot.refresh"
+    /// How long a budget figure read for the widget is good for.
+    nonisolated static let budgetMaxAge: TimeInterval = 15 * 60
 
     /// Turns this month's bills and budget into what the widget shows.
     nonisolated static func snapshot(
@@ -13,11 +15,14 @@ enum WidgetFeed {
         now: Date = .now,
         calendar: Calendar = .current
     ) -> WidgetSnapshot {
-        let outgoing = statuses.filter { !$0.bill.isIncome }
+        // The widget shows one sum, so it shows only bills in the main
+        // currency rather than adding dollars to euros.
+        let currency = BillSchedule.mainCurrency(of: statuses.filter { !$0.bill.isIncome })
+        let outgoing = statuses.filter { !$0.bill.isIncome && $0.bill.currency == currency }
         return WidgetSnapshot(
             updatedAt: now,
             month: WidgetSnapshot.monthKey(now, calendar: calendar),
-            currency: outgoing.first?.bill.currency ?? "USD",
+            currency: currency,
             bills: outgoing.map { status in
                 WidgetSnapshot.Bill(
                     id: status.bill.id,
@@ -36,10 +41,17 @@ enum WidgetFeed {
     /// widget. The budget is a nicety: if it cannot be loaded the widget
     /// shows bills alone.
     static func publish(statuses: [BillStatus], client: APIClient) async {
+        let saved = WidgetStore.load()
+        // Bills load each time Overview shows. When the bills are unchanged
+        // and the budget was read in the last quarter hour, leave the
+        // server alone rather than asking for the budget again.
+        if let saved, Date.now.timeIntervalSince(saved.updatedAt) < budgetMaxAge,
+           snapshot(statuses: statuses, budget: saved.budget, now: saved.updatedAt) == saved {
+            return
+        }
         let budget = try? await currentBudget(client: client)
         guard !Task.isCancelled else { return }
         let fresh = snapshot(statuses: statuses, budget: budget)
-        let saved = WidgetStore.load()
         // Only the time differs on most loads; skip the redraw then.
         var comparable = fresh
         comparable.updatedAt = saved?.updatedAt ?? fresh.updatedAt

@@ -232,6 +232,27 @@ final class APIClient {
 // MARK: - Endpoints
 
 extension APIClient {
+    /// Every item of a list, page by page. Sure hands out at most 100 items
+    /// a page whatever is asked for, so one page is not the whole list for
+    /// a bigger household. Stops after `maxPages` to keep the load on the
+    /// server bounded.
+    func everyPage<Item: Decodable & Sendable>(
+        _ path: String,
+        query: [String: String?] = [:],
+        maxPages: Int = 10
+    ) async throws -> [Item] {
+        var items: [Item] = []
+        for number in 1...max(maxPages, 1) {
+            var query = query
+            query["per_page"] = "100"
+            query["page"] = String(number)
+            let page: Page<Item> = try await get(path, query: query)
+            items += page.items
+            guard page.hasMore, !page.items.isEmpty else { break }
+        }
+        return items
+    }
+
     func login(email: String, password: String, otpCode: String?, device: DeviceInfo) async throws -> Credential {
         let input = LoginInput(email: email, password: password, otpCode: otpCode, device: device)
         let tokens: TokenResponse = try await send("POST", "auth/login", body: input)
@@ -251,8 +272,7 @@ extension APIClient {
     }
 
     func accounts() async throws -> [Account] {
-        let page: Page<Account> = try await get("accounts", query: ["per_page": "100"])
-        return page.items
+        try await everyPage("accounts")
     }
 
     func balanceSheet() async throws -> BalanceSheet {
@@ -282,16 +302,11 @@ extension APIClient {
     }
 
     func budgetCategories(budgetID: String) async throws -> [BudgetCategory] {
-        let page: Page<BudgetCategory> = try await get(
-            "budget_categories",
-            query: ["budget_id": budgetID, "per_page": "100"]
-        )
-        return page.items
+        try await everyPage("budget_categories", query: ["budget_id": budgetID])
     }
 
     func categories() async throws -> [CategoryRef] {
-        let page: Page<CategoryRef> = try await get("categories", query: ["per_page": "100"])
-        return page.items
+        try await everyPage("categories")
     }
 
     func transactions(matching filter: TransactionFilter, page: Int, perPage: Int = 30) async throws -> Page<Transaction> {
@@ -303,8 +318,7 @@ extension APIClient {
 
     /// Every repeating payment Sure knows of, confirmed or only suggested.
     func bills() async throws -> [Bill] {
-        let page: Page<Bill> = try await get("recurring_transactions", query: ["per_page": "100"])
-        return page.items
+        try await everyPage("recurring_transactions")
     }
 
     /// Starts or stops tracking a repeating payment as a bill.
@@ -332,11 +346,7 @@ extension APIClient {
     }
 
     func balances(accountID: String, since startDate: String) async throws -> [BalancePoint] {
-        let page: Page<BalancePoint> = try await get(
-            "balances",
-            query: ["account_id": accountID, "start_date": startDate, "per_page": "100"]
-        )
-        return page.items
+        try await everyPage("balances", query: ["account_id": accountID, "start_date": startDate])
     }
 
     /// Daily holdings since a date, for one account or all of them.

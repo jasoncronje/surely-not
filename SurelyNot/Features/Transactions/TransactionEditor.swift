@@ -228,7 +228,8 @@ struct TransactionEditor: View {
             name: name.trimmingCharacters(in: .whitespaces),
             notes: trimmedNotes.isEmpty ? nil : trimmedNotes,
             categoryId: categoryID,
-            nature: isIncome ? "income" : "expense"
+            nature: isIncome ? "income" : "expense",
+            clearsBlanks: existing != nil
         )
         run {
             if let existing {

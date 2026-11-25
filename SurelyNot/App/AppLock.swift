@@ -21,7 +21,7 @@ final class AppLock {
 
     /// How long the app can be away before it asks again.
     nonisolated static let grace: TimeInterval = 60
-    private static let enabledKey = "appLockEnabled"
+    nonisolated static let enabledKey = "appLockEnabled"
 
     private(set) var isEnabled: Bool
     private(set) var cover: Cover

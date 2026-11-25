@@ -106,6 +106,19 @@ private func decode<T: Decodable>(_ type: T.Type, _ json: String) throws -> T {
         #expect(body["account_id"] == nil)
         #expect(body["notes"] == nil)
     }
+
+    @Test func anEditClearsANoteAndCategoryThatWereRemoved() throws {
+        let input = TransactionInput(
+            accountId: nil, date: "2026-11-20", amount: 5, name: "Lunch",
+            notes: nil, categoryId: nil, nature: "expense", clearsBlanks: true
+        )
+        let data = try APIClient.encoder.encode(TransactionEnvelope(transaction: input))
+        let root = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let body = try #require(root["transaction"] as? [String: Any])
+        #expect(body["notes"] as? String == "")
+        #expect(body["category_id"] is NSNull)
+        #expect(body["clears_blanks"] == nil)
+    }
 }
 
 @Suite struct ServerAddressTests {
@@ -700,10 +713,11 @@ private func decode<T: Decodable>(_ type: T.Type, _ json: String) throws -> T {
         type: String = "subscription",
         account: String = "a1",
         name: String? = "Music",
-        max: Int? = nil
+        max: Int? = nil,
+        currency: String = "USD"
     ) throws -> Bill {
         try decode(Bill.self, """
-        {"id":"\(id)","amount":"$12.99","amount_cents":\(cents),"currency":"USD",
+        {"id":"\(id)","amount":"$12.99","amount_cents":\(cents),"currency":"\(currency)",
          "expected_day_of_month":\(day),"last_occurrence_date":"2026-10-05",
          "next_expected_date":"2026-11-05","status":"\(status)","occurrence_count":3,
          "name":\(name.map { "\"\($0)\"" } ?? "null"),"manual":false,"payment_url":null,"autopay":true,"notes":"",
@@ -865,6 +879,32 @@ private func decode<T: Decodable>(_ type: T.Type, _ json: String) throws -> T {
             calendar: calendar
         )
         #expect(plan.map(\.id) == ["bill-b1-2026-12"])
+    }
+
+    @Test func remindersCanLeaveOutAmounts() throws {
+        let now = try #require(calendar.date(bySettingHour: 12, minute: 0, second: 0, of: try day("2026-11-24")))
+        let status = BillStatus(bill: try bill(id: "b1", day: 26), dueDate: "2026-11-26", state: .due(daysAway: 2))
+        let shown = BillReminders.plan(statuses: [status], now: now, calendar: calendar)
+        let hidden = BillReminders.plan(statuses: [status], showAmounts: false, now: now, calendar: calendar)
+        #expect(shown.first?.body.contains("12.99") == true)
+        #expect(hidden.allSatisfy { !$0.body.contains("12.99") })
+        #expect(hidden.first?.body == "Paid automatically.")
+    }
+
+    @Test func totalsNeverAddDifferentCurrencies() throws {
+        let statuses = [
+            BillStatus(bill: try bill(id: "b1", cents: 1000), dueDate: "2026-11-05", state: .due(daysAway: 1)),
+            BillStatus(bill: try bill(id: "b2", cents: 2000), dueDate: "2026-11-06", state: .due(daysAway: 2)),
+            BillStatus(bill: try bill(id: "b3", cents: 500, currency: "EUR"), dueDate: "2026-11-07", state: .due(daysAway: 3)),
+        ]
+        #expect(BillSchedule.mainCurrency(of: statuses) == "USD")
+        let snapshot = BillsModel.Snapshot(statuses: statuses, others: [], suggestions: [])
+        let total = snapshot.total(statuses)
+        #expect(total.hasPrefix(MoneyFormat.string(cents: 3000, currency: "USD")))
+        #expect(total.contains(" + "))
+        let widget = WidgetFeed.snapshot(statuses: statuses, budget: nil)
+        #expect(widget.currency == "USD")
+        #expect(widget.bills.map(\.id) == ["b1", "b2"])
     }
 
     @Test func anAmountRangeGoesIntoTheQuery() {

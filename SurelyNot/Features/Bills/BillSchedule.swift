@@ -149,6 +149,12 @@ nonisolated enum BillSchedule {
         return result.sorted { ($0.expectedDayOfMonth, $0.title) < ($1.expectedDayOfMonth, $1.title) }
     }
 
+    /// The currency most of these bills are in, for sums and the widget.
+    static func mainCurrency(of statuses: [BillStatus]) -> String {
+        let counts = Dictionary(grouping: statuses, by: \.bill.currency).mapValues(\.count)
+        return counts.max { ($0.value, $1.key) < ($1.value, $0.key) }?.key ?? "USD"
+    }
+
     /// "5 Nov" for a date as the API writes it.
     static func shortDate(_ string: String) -> String {
         guard let date = Day.date(string) else { return string }

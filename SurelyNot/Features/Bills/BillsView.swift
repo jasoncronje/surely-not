@@ -16,11 +16,19 @@ final class BillsModel {
         var incoming: [BillStatus] { statuses.filter { $0.bill.isIncome } }
         var unpaid: [BillStatus] { outgoing.filter { !$0.isPaid } }
         var paid: [BillStatus] { outgoing.filter(\.isPaid) }
-        var currency: String { statuses.first?.bill.currency ?? "USD" }
+        var currency: String { BillSchedule.mainCurrency(of: outgoing) }
         var isEmpty: Bool { statuses.isEmpty && others.isEmpty }
 
+        /// The sum of these bills. Bills in different currencies are never
+        /// added together: each currency gets its own sum, main one first.
         func total(_ list: [BillStatus]) -> String {
-            MoneyFormat.string(cents: list.reduce(0) { $0 + $1.cents }, currency: currency)
+            let sums = Dictionary(grouping: list, by: \.bill.currency)
+                .mapValues { $0.reduce(0) { $0 + $1.cents } }
+            guard !sums.isEmpty else { return MoneyFormat.string(cents: 0, currency: currency) }
+            return sums
+                .sorted { ($0.key == currency ? 0 : 1, $0.key) < ($1.key == currency ? 0 : 1, $1.key) }
+                .map { MoneyFormat.string(cents: $0.value, currency: $0.key) }
+                .joined(separator: " + ")
         }
     }
 

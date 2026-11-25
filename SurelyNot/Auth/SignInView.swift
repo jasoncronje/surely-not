@@ -134,6 +134,16 @@ struct SignInView: View {
             .frame(minHeight: 56)
             .background(Theme.surface, in: .rect(cornerRadius: Theme.controlRadius))
 
+            if server.url.scheme?.lowercased() == "http" {
+                Label(
+                    "This address is not encrypted. Your password and finances travel in plain text, so only use it on a network you trust.",
+                    systemImage: "lock.open.fill"
+                )
+                .font(Theme.small)
+                .foregroundStyle(Theme.negative)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
             switch method {
             case .singleSignOn:
                 message

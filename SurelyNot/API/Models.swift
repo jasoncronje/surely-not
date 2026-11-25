@@ -187,6 +187,29 @@ nonisolated struct TransactionInput: Encodable, Sendable {
     var notes: String?
     var categoryId: String?
     var nature: String
+    /// True for an edit. Then a blank note or category is sent as cleared,
+    /// rather than left out, which would leave the old one on the server.
+    var clearsBlanks = false
+
+    private enum CodingKeys: String, CodingKey {
+        case accountId, date, amount, name, notes, categoryId, nature
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(accountId, forKey: .accountId)
+        try container.encode(date, forKey: .date)
+        try container.encode(amount, forKey: .amount)
+        try container.encode(name, forKey: .name)
+        try container.encode(nature, forKey: .nature)
+        if clearsBlanks {
+            try container.encode(notes ?? "", forKey: .notes)
+            try container.encode(categoryId, forKey: .categoryId)
+        } else {
+            try container.encodeIfPresent(notes, forKey: .notes)
+            try container.encodeIfPresent(categoryId, forKey: .categoryId)
+        }
+    }
 }
 
 nonisolated struct TransactionEnvelope: Encodable, Sendable {

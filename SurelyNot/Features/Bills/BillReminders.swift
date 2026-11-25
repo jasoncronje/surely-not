@@ -26,9 +26,11 @@ enum BillReminders {
     }
 
     /// The reminders to have waiting: this month's bills that are still
-    /// unpaid, and every bill's turn next month.
+    /// unpaid, and every bill's turn next month. With `showAmounts` off the
+    /// text leaves out what each bill costs, for people who lock the app.
     nonisolated static func plan(
         statuses: [BillStatus],
+        showAmounts: Bool = true,
         now: Date = .now,
         calendar: Calendar = .current
     ) -> [Reminder] {
@@ -52,12 +54,21 @@ enum BillReminders {
                 result.append(Reminder(
                     id: "\(prefix)\(bill.id)-\(WidgetSnapshot.monthKey(due, calendar: calendar))",
                     title: bill.autopay == true ? "\(bill.title) comes out tomorrow" : "\(bill.title) is due tomorrow",
-                    body: bill.autopay == true ? "\(amount), paid automatically." : "\(amount). Open Surely Not to see your bills.",
+                    body: body(amount: showAmounts ? amount : nil, autopay: bill.autopay == true),
                     fireDate: fire
                 ))
             }
         }
         return result.sorted { ($0.fireDate, $0.id) < ($1.fireDate, $1.id) }
+    }
+
+    nonisolated private static func body(amount: String?, autopay: Bool) -> String {
+        switch (amount, autopay) {
+        case (let amount?, true): "\(amount), paid automatically."
+        case (let amount?, false): "\(amount). Open Surely Not to see your bills."
+        case (nil, true): "Paid automatically."
+        case (nil, false): "Open Surely Not to see your bills."
+        }
     }
 
     /// Replaces the waiting reminders with the ones these bills call for.
@@ -68,7 +79,9 @@ enum BillReminders {
         guard await center.notificationSettings().authorizationStatus == .authorized else { return }
         await removeAll()
         let calendar = Calendar.current
-        for reminder in plan(statuses: statuses) {
+        // Someone who locks the app does not want amounts on the lock screen.
+        let showAmounts = !UserDefaults.standard.bool(forKey: AppLock.enabledKey)
+        for reminder in plan(statuses: statuses, showAmounts: showAmounts) {
             let content = UNMutableNotificationContent()
             content.title = reminder.title
             content.body = reminder.body
