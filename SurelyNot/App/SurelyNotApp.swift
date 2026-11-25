@@ -83,15 +83,15 @@ struct MainTabView: View {
         TabView {
             // Matches Sure on the web: Home holds the money you have (accounts
             // live there), Plan holds what is coming (budgets and bills).
-            Tab("Home", systemImage: "chart.pie") {
+            Tab("Home", systemImage: "house") {
                 OverviewView(client: client)
             }
-            Tab("Activity", systemImage: "list.bullet") {
+            Tab("Activity", systemImage: "arrow.left.arrow.right") {
                 NavigationStack {
                     TransactionsView(client: client, title: "Activity", isRoot: true)
                 }
             }
-            Tab("Plan", systemImage: "safari") {
+            Tab("Plan", systemImage: "calendar") {
                 PlanView(client: client, bills: bills)
             }
             Tab("Chat", systemImage: "bubble.left.and.bubble.right") {
