@@ -86,7 +86,19 @@ struct TransactionDetailView: View {
                             if index > 0 {
                                 RowRule()
                             }
-                            FactRow(label: fact.label, value: fact.value)
+                            if fact.label == "Category" {
+                                // Tapping the category moves the transaction to another one.
+                                Menu {
+                                    CategoryChoices(transaction: transaction) { updated in
+                                        transaction = updated
+                                    }
+                                } label: {
+                                    FactRow(label: fact.label, value: fact.value, symbol: "chevron.up.chevron.down")
+                                }
+                                .accessibilityHint("Changes the category")
+                            } else {
+                                FactRow(label: fact.label, value: fact.value)
+                            }
                         }
                     }
                 }
@@ -185,6 +197,8 @@ struct TransactionDetailView: View {
 private struct FactRow: View {
     let label: String
     let value: String
+    /// A small mark after the value, for a row that does something when tapped.
+    var symbol: String?
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 16) {
@@ -196,7 +210,14 @@ private struct FactRow: View {
                 .font(Theme.bodyStrong)
                 .foregroundStyle(Theme.text)
                 .multilineTextAlignment(.trailing)
+            if let symbol {
+                Image(systemName: symbol)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.muted)
+                    .padding(.leading, -8)
+            }
         }
+        .contentShape(.rect)
         .accessibilityElement(children: .combine)
     }
 }

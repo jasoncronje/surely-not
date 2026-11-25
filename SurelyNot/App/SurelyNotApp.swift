@@ -29,7 +29,15 @@ struct SurelyNotApp: App {
 
 struct MainTabView: View {
     let client: APIClient
-    @State private var changes = LedgerChanges()
+    @State private var changes: LedgerChanges
+    @State private var categoryChanger: CategoryChanger
+
+    init(client: APIClient) {
+        self.client = client
+        let changes = LedgerChanges()
+        _changes = State(initialValue: changes)
+        _categoryChanger = State(initialValue: CategoryChanger(client: client, changes: changes))
+    }
 
     var body: some View {
         TabView {
@@ -55,6 +63,19 @@ struct MainTabView: View {
         // comes back on scrolling up.
         .tabBarMinimizeBehavior(.onScrollDown)
         .environment(changes)
+        .environment(categoryChanger)
+        .task { await categoryChanger.loadIfNeeded() }
+        .alert(
+            "That did not work",
+            isPresented: Binding(
+                get: { categoryChanger.error != nil },
+                set: { if !$0 { categoryChanger.error = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(categoryChanger.error ?? "")
+        }
     }
 }
 

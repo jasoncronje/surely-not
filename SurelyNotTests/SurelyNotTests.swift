@@ -637,6 +637,12 @@ private func decode<T: Decodable>(_ type: T.Type, _ json: String) throws -> T {
         #expect(json == #"{"recurring_transaction":{"status":"active"}}"#)
     }
 
+    @Test func movingCategorySendsOnlyTheCategory() throws {
+        let body = TransactionCategoryChange(transaction: .init(categoryId: "c1"))
+        let json = String(decoding: try APIClient.encoder.encode(body), as: UTF8.self)
+        #expect(json == #"{"transaction":{"category_id":"c1"}}"#)
+    }
+
     @Test func anAmountRangeGoesIntoTheQuery() {
         var filter = TransactionFilter()
         filter.amounts = Decimal(string: "236.85")!...Decimal(string: "261.79")!

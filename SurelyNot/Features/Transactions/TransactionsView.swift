@@ -103,6 +103,7 @@ struct TransactionsView: View {
     @State private var filter: TransactionFilter
     @State private var accounts: [Account] = []
     @State private var categories: [CategoryRef] = []
+    @State private var isAdding = false
 
     init(
         client: APIClient,
@@ -123,8 +124,13 @@ struct TransactionsView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: Theme.gap) {
                 if isRoot {
-                    ScreenHeader(title: title)
-                        .padding(.top, 8)
+                    ScreenHeader(title: title) {
+                        Button("Add transaction", systemImage: "plus") {
+                            isAdding = true
+                        }
+                        .buttonStyle(IconButtonStyle())
+                    }
+                    .padding(.top, 8)
                 }
                 if let summary {
                     SummaryCard(summary: summary)
@@ -149,6 +155,19 @@ struct TransactionsView: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(isRoot ? .hidden : .visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("Add transaction", systemImage: "plus") {
+                    isAdding = true
+                }
+            }
+        }
+        .sheet(isPresented: $isAdding) {
+            // Opened from one account's list, the form starts on that account.
+            TransactionEditor(client: client, target: .new(accountID: filter.account?.id, currency: nil)) { _ in
+                changes.noteChange()
+            }
+        }
         .scrollDismissesKeyboard(.immediately)
         .refreshable { await model.reload() }
         .task(id: filter) {
@@ -431,6 +450,7 @@ struct TransactionDayList<Destination: View>: View {
                             TransactionRow(transaction: transaction, showsAccount: showsAccount)
                         }
                         .buttonStyle(RowButtonStyle())
+                        .categoryContextMenu(for: transaction)
                     }
                 }
                 .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))

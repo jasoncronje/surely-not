@@ -186,6 +186,7 @@ struct OverviewView: View {
                             TransactionRow(transaction: transaction, showsAccount: true)
                         }
                         .buttonStyle(RowButtonStyle())
+                        .categoryContextMenu(for: transaction)
                     }
                 }
                 .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))

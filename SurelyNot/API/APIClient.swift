@@ -317,6 +317,12 @@ extension APIClient {
         try await send("PATCH", "transactions/\(id)", body: TransactionEnvelope(transaction: input))
     }
 
+    /// Moves a transaction to another category, leaving the rest of it alone.
+    func setCategory(transactionID: String, categoryID: String) async throws -> Transaction {
+        let body = TransactionCategoryChange(transaction: .init(categoryId: categoryID))
+        return try await send("PATCH", "transactions/\(transactionID)", body: body)
+    }
+
     func deleteTransaction(id: String) async throws {
         try await sendDiscardingResponse("DELETE", "transactions/\(id)")
     }

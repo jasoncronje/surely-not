@@ -17,6 +17,7 @@
 		412199E930B7A2A295098EB7 /* AccountsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0938E34FBAE12B653508F4CE /* AccountsView.swift */; };
 		48F4217D112121D00D4DA378 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86D0CF2AC0975810E329A155 /* Session.swift */; };
 		539E90A967744BFE46C85B22 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 590161F90D4418956DFE9AF7 /* Assets.xcassets */; };
+		596AEC7ACE02DBE9ED42CEDE /* CategoryChanger.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9293F1B6360A257BE14C41E /* CategoryChanger.swift */; };
 		7857E4116C4AD43E420F72AC /* TransactionEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC584E56DBBB28E780122466 /* TransactionEditor.swift */; };
 		7CEC3E066AB8019AF99F72C2 /* SurelyNotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80AF54CB4A9073279245C20C /* SurelyNotTests.swift */; };
 		81205D982CF51A65199011CE /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = B185A0D881B6E5609162D06E /* Models.swift */; };
@@ -69,6 +70,7 @@
 		B185A0D881B6E5609162D06E /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		B6F7E76A58D82C6098FCF5AD /* SurelyNotTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SurelyNotTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CEFEA3F1333CC55EC915B123 /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
+		D9293F1B6360A257BE14C41E /* CategoryChanger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryChanger.swift; sourceTree = "<group>"; };
 		D96F0F121585BF7159D31929 /* BudgetsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetsView.swift; sourceTree = "<group>"; };
 		DFEF98CDE2694B1ABF5CD3E3 /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
 		E106363FDAD77D35497D5B88 /* Manrope.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Manrope.ttf; sourceTree = "<group>"; };
@@ -174,6 +176,7 @@
 		98DDC859C42DE2CA4355CFFE /* Transactions */ = {
 			isa = PBXGroup;
 			children = (
+				D9293F1B6360A257BE14C41E /* CategoryChanger.swift */,
 				354C40158B81E9E7132175C8 /* TransactionDetailView.swift */,
 				AC584E56DBBB28E780122466 /* TransactionEditor.swift */,
 				4DDC964FDA5A59ACE60D042D /* TransactionFilter.swift */,
@@ -327,6 +330,7 @@
 				8C440361E94BC4B6DA1D068D /* BillSchedule.swift in Sources */,
 				DCD06C8B9E346EA35F131828 /* BillsView.swift in Sources */,
 				2C381A4D0F5DC96E7C22C894 /* BudgetsView.swift in Sources */,
+				596AEC7ACE02DBE9ED42CEDE /* CategoryChanger.swift in Sources */,
 				2CC2D15068ED6F0ED2900025 /* ChatListView.swift in Sources */,
 				82DB61AA606C6BA1743CC80C /* ChatView.swift in Sources */,
 				09805744FF0483A8F69BC515 /* Components.swift in Sources */,

@@ -191,6 +191,15 @@ nonisolated struct TransactionEnvelope: Encodable, Sendable {
     let transaction: TransactionInput
 }
 
+/// Body for moving a transaction to another category and nothing else.
+nonisolated struct TransactionCategoryChange: Encodable, Sendable {
+    nonisolated struct Fields: Encodable, Sendable {
+        let categoryId: String
+    }
+
+    let transaction: Fields
+}
+
 // MARK: - Bills
 
 /// A payment Sure expects to repeat, such as a subscription or a loan.

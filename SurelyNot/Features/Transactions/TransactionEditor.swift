@@ -26,7 +26,8 @@ nonisolated enum AmountParser {
 /// Adds a transaction to an account, or edits or deletes an existing one.
 struct TransactionEditor: View {
     enum Target {
-        case new(accountID: String, currency: String)
+        /// A new transaction. Without an account the form asks for one.
+        case new(accountID: String?, currency: String?)
         case existing(Transaction)
     }
 
@@ -41,6 +42,10 @@ struct TransactionEditor: View {
     /// Called once the server has accepted the change, before the sheet closes.
     private let onDone: (Outcome) -> Void
     @State private var categories: [CategoryRef] = []
+    /// The accounts to choose from, when the form has to ask.
+    @State private var accounts: [Account] = []
+    @State private var accountID: String?
+    @AppStorage("lastTransactionAccountID") private var lastAccountID = ""
 
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
@@ -68,6 +73,15 @@ struct TransactionEditor: View {
         _date = State(initialValue: existing.flatMap { Day.date($0.date) } ?? .now)
         _categoryID = State(initialValue: existing?.category?.id)
         _notes = State(initialValue: existing?.notes ?? "")
+        if case .new(let id, _) = target {
+            _accountID = State(initialValue: id)
+        }
+    }
+
+    /// True when this is a new transaction that was not opened from an account.
+    private var asksForAccount: Bool {
+        if case .new(_, nil) = target { return true }
+        return false
     }
 
     private var amount: Decimal? {
@@ -76,18 +90,32 @@ struct TransactionEditor: View {
 
     private var currency: String {
         switch target {
-        case .new(_, let currency): currency
+        case .new(_, let currency):
+            currency ?? accounts.first { $0.id == accountID }?.currency ?? ""
         case .existing(let transaction): transaction.currency
         }
     }
 
     private var canSave: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty && amount != nil && !isWorking
+            && (existing != nil || accountID != nil)
     }
 
     var body: some View {
         NavigationStack {
             Form {
+                if asksForAccount {
+                    Section {
+                        Picker("Account", selection: $accountID) {
+                            if accountID == nil {
+                                Text("Choose").tag(String?.none)
+                            }
+                            ForEach(accounts) { account in
+                                Text(account.name).tag(String?.some(account.id))
+                            }
+                        }
+                    }
+                }
                 Section {
                     TextField("Name", text: $name)
                     HStack {
@@ -155,6 +183,25 @@ struct TransactionEditor: View {
             }
             .interactiveDismissDisabled(isWorking)
             .task { await loadCategories() }
+            .task { await loadAccounts() }
+        }
+    }
+
+    /// The accounts to pick from, starting on the one used last time.
+    private func loadAccounts() async {
+        guard asksForAccount else { return }
+        do {
+            accounts = try await client.accounts()
+                .filter { $0.status == nil || $0.status == "active" }
+                .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        } catch is CancellationError {
+            return
+        } catch {
+            errorMessage = error.localizedDescription
+            return
+        }
+        if accountID == nil, accounts.contains(where: { $0.id == lastAccountID }) {
+            accountID = lastAccountID
         }
     }
 
@@ -170,12 +217,12 @@ struct TransactionEditor: View {
     private func save() {
         guard let amount else { return }
         let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
-        var accountID: String?
-        if case .new(let id, _) = target {
-            accountID = id
+        let newAccountID = existing == nil ? accountID : nil
+        if asksForAccount, let newAccountID {
+            lastAccountID = newAccountID
         }
         let input = TransactionInput(
-            accountId: accountID,
+            accountId: newAccountID,
             date: Day.string(date),
             amount: amount,
             name: name.trimmingCharacters(in: .whitespaces),
