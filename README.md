@@ -41,6 +41,12 @@ Requires Xcode 26 or later and iOS 26 or later. There are no third-party depende
 
 Open `SurelyNot.xcodeproj` and run the `SurelyNot` scheme.
 
+### TestFlight
+
+The app is in App Store Connect as "Surely Not" (app ID `6839306865`). `scripts/testflight.sh` archives a Release build, signs it for App Store Connect and uploads it. It needs Xcode signed in to the team and the `asc` CLI signed in with an App Store Connect API key. The build number is the current UTC time, so each upload is higher than the last. The "Internal Testers" group gets every build; external testers would need Apple's beta review first.
+
+Whatever `Config/Local.xcconfig` says goes into the build, so on a Mac with Wallet sync on, TestFlight builds carry FinanceKit too.
+
 ### Apple Wallet
 
 Apple has no server API for Apple Card. The only way to read it is on the phone, through Apple's FinanceKit. So the app reads Wallet and uploads what changed to Sure's Wallet API (`/api/v1/financekit`), which Sure already has.
