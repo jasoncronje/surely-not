@@ -136,13 +136,16 @@ struct AccountsView: View {
                             }
                         }
                         // Wallet sync is what the app adds over Sure on the web,
-                        // so it sits first.
-                        NavigationLink {
-                            WalletView(client: client)
-                        } label: {
-                            WalletEntryRow()
+                        // so it sits first. The sample household cannot take
+                        // Wallet data, so it is left out there.
+                        if !client.isSample {
+                            NavigationLink {
+                                WalletView(client: client)
+                            } label: {
+                                WalletEntryRow()
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                         if summary.hasInvestments {
                             NavigationLink {
                                 InvestmentsView(client: client)

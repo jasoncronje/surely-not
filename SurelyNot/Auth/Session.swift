@@ -147,11 +147,43 @@ final class Session {
     var notice: String?
 
     var isSignedIn: Bool { client != nil }
+    /// True while looking around the made-up household instead of a real server.
+    var isSample: Bool { client?.isSample ?? false }
+    /// Set by a fresh sign-in, so the app offers the extras (lock, reminders)
+    /// once before Home. Cleared when that step is done or skipped.
+    var offersSetup: Bool {
+        didSet { UserDefaults.standard.set(offersSetup, forKey: Self.setupKey) }
+    }
+
+    /// Set when leaving the sample to connect a server, so the welcome
+    /// screen opens straight onto sign-in.
+    var opensSignIn = false
+
+    private static let sampleKey = "sampleMode"
+    private static let setupKey = "offersSetup"
 
     init() {
+        offersSetup = UserDefaults.standard.bool(forKey: Self.setupKey)
         if let saved = KeychainStore.load() {
             activate(saved)
+        } else if UserDefaults.standard.bool(forKey: Self.sampleKey) {
+            startSample()
         }
+    }
+
+    /// Opens the app on the sample household. Nothing is saved to the
+    /// keychain, and nothing reaches the widget or notifications.
+    func startSample() {
+        UserDefaults.standard.set(true, forKey: Self.sampleKey)
+        notice = nil
+        client = APIClient(
+            baseURL: SampleServer.baseURL,
+            credential: .apiKey("sample"),
+            deviceID: Self.deviceID,
+            session: SampleServer.session
+        )
+        serverURL = SampleServer.baseURL
+        signInMethod = .apiKey
     }
 
     /// A stable ID for this install, which Sure uses to tie tokens to a device.
@@ -205,6 +237,8 @@ final class Session {
     }
 
     func signOut() {
+        UserDefaults.standard.set(false, forKey: Self.sampleKey)
+        offersSetup = false
         KeychainStore.clear()
         WidgetFeed.clear()
         Task { await BillReminders.removeAll() }
@@ -215,6 +249,8 @@ final class Session {
 
     private func store(_ saved: SavedSession) {
         KeychainStore.save(saved)
+        UserDefaults.standard.set(false, forKey: Self.sampleKey)
+        offersSetup = true
         notice = nil
         activate(saved)
     }

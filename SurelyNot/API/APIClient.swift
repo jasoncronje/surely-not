@@ -41,6 +41,9 @@ final class APIClient {
         self.session = session
     }
 
+    /// True for the made-up household that ships with the app.
+    var isSample: Bool { baseURL.host() == SampleServer.host }
+
     static let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase

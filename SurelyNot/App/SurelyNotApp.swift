@@ -33,7 +33,7 @@ struct SurelyNotApp: App {
             .tint(Theme.text)
         }
         .onChange(of: scenePhase) {
-            if scenePhase == .background, session.isSignedIn {
+            if scenePhase == .background, session.isSignedIn, !session.isSample {
                 WidgetFeed.scheduleRefresh()
             }
         }
@@ -47,13 +47,24 @@ struct SurelyNotApp: App {
 
     @ViewBuilder
     private var root: some View {
-        if let client = session.client {
-            MainTabView(client: client, signIn: session.signInMethod)
-                // A new sign-in gets fresh screens with no data from the last one.
-                .id(ObjectIdentifier(client))
-        } else {
-            SignInView()
+        Group {
+            if let client = session.client {
+                if session.offersSetup, !session.isSample {
+                    SetupFlow(client: client)
+                        .transition(.opacity)
+                } else {
+                    MainTabView(client: client, signIn: session.signInMethod)
+                        // A new sign-in gets fresh screens with no data from the last one.
+                        .id(ObjectIdentifier(client))
+                        .transition(.opacity)
+                }
+            } else {
+                OnboardingView()
+                    .transition(.opacity)
+            }
         }
+        .animation(.easeInOut(duration: 0.35), value: session.client.map(ObjectIdentifier.init))
+        .animation(.easeInOut(duration: 0.35), value: session.offersSetup)
     }
 }
 
@@ -66,6 +77,7 @@ struct MainTabView: View {
     /// also refreshes the bill reminders and the widget.
     @State private var bills: BillsModel
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(Session.self) private var session
 
     init(client: APIClient, signIn: SignInMethod?) {
         self.client = client
@@ -104,6 +116,7 @@ struct MainTabView: View {
         // The tab bar shrinks out of the way while reading down a screen and
         // comes back on scrolling up.
         .tabBarMinimizeBehavior(.onScrollDown)
+        .modifier(SampleAccessory(isSample: client.isSample))
         .environment(changes)
         .environment(categoryChanger)
         .environment(wallet)
@@ -169,7 +182,7 @@ struct SettingsView: View {
                     Text("Server")
                         .font(Theme.small)
                         .foregroundStyle(Theme.muted)
-                    Text(session.serverURL?.host() ?? "Not signed in")
+                    Text(session.isSample ? "Sample data" : session.serverURL?.host() ?? "Not signed in")
                         .font(Theme.bodyStrong)
                         .foregroundStyle(Theme.text)
                         .lineLimit(1)
@@ -323,7 +336,7 @@ struct SettingsView: View {
                         }
                         .tint(Theme.accent)
                     }
-                    Button("Sign out") {
+                    Button(session.isSample ? "Leave sample data" : "Sign out") {
                         session.signOut()
                     }
                     .buttonStyle(PrimaryButtonStyle(fullWidth: true))

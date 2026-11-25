@@ -54,7 +54,8 @@ final class BillsModel {
                 suggestions: BillSchedule.suggestions(from: bills)
             )
         }
-        if let snapshot = state.value {
+        // Sample bills stay inside the app: no widget, no notifications.
+        if let snapshot = state.value, !client.isSample {
             await WidgetFeed.publish(statuses: snapshot.statuses, client: client)
             await BillReminders.sync(statuses: snapshot.statuses)
         }
