@@ -26,6 +26,10 @@ final class BillsModel {
 
     private let client: APIClient
     var state: Loadable<Snapshot> = .loading
+    /// Why the last change did not go through, for an alert.
+    var actionError: String?
+    /// Bills with a change on its way to the server.
+    private(set) var changing: Set<String> = []
 
     init(client: APIClient) {
         self.client = client
@@ -42,6 +46,24 @@ final class BillsModel {
                 suggestions: BillSchedule.suggestions(from: bills)
             )
         }
+    }
+
+    /// Starts or stops tracking a repeating payment, then loads the new picture.
+    /// Returns true when the server took the change.
+    @discardableResult
+    func setTracked(_ tracked: Bool, _ bill: Bill) async -> Bool {
+        guard changing.insert(bill.id).inserted else { return false }
+        defer { changing.remove(bill.id) }
+        do {
+            try await client.setBill(id: bill.id, tracked: tracked)
+        } catch is CancellationError {
+            return false
+        } catch {
+            actionError = error.localizedDescription
+            return false
+        }
+        await load()
+        return true
     }
 
     /// Every transaction a payment of this month's bills could be among.
@@ -87,7 +109,7 @@ struct BillsBlock: View {
             .padding(.horizontal, 4)
             switch model.state {
             case .loaded(let snapshot) where !snapshot.unpaid.isEmpty:
-                BillRows(client: client, statuses: Array(snapshot.unpaid.prefix(3)))
+                BillRows(client: client, model: model, statuses: Array(snapshot.unpaid.prefix(3)))
             default:
                 Card {
                     LoadableView(state: model.state, retry: model.load) { snapshot in
@@ -173,7 +195,7 @@ struct BillsView: View {
 
         if !snapshot.suggestions.isEmpty {
             NavigationLink {
-                SuggestionsView(client: client, bills: snapshot.suggestions)
+                SuggestionsView(client: client, model: model)
             } label: {
                 LinkRow(title: "\(snapshot.suggestions.count) more that Sure has spotted")
             }
@@ -188,7 +210,7 @@ struct BillsView: View {
     private func section(_ title: String, _ statuses: [BillStatus]) -> some View {
         if !statuses.isEmpty {
             heading(title)
-            BillRows(client: client, statuses: statuses)
+            BillRows(client: client, model: model, statuses: statuses)
         }
     }
 
@@ -207,7 +229,7 @@ struct BillsView: View {
                     RowRule().padding(.leading, 68)
                 }
                 NavigationLink {
-                    BillDetailView(client: client, bill: bill, status: nil)
+                    BillDetailView(client: client, model: model, bill: bill, status: nil)
                 } label: {
                     row(bill)
                 }
@@ -227,12 +249,18 @@ struct BillsView: View {
 /// Repeating payments Sure has noticed but nobody has confirmed.
 private struct SuggestionsView: View {
     let client: APIClient
-    let bills: [Bill]
+    let model: BillsModel
+
+    private var bills: [Bill] {
+        model.state.value?.suggestions ?? []
+    }
 
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: Theme.gap) {
-                Text("Sure noticed these repeat. Confirm one in Sure on the web and it joins your bills here.")
+                Text(bills.isEmpty
+                    ? "Nothing left to review."
+                    : "Sure noticed these repeat. Track one and it joins your bills.")
                     .font(Theme.body)
                     .foregroundStyle(Theme.muted)
                     .padding(.horizontal, 4)
@@ -241,16 +269,25 @@ private struct SuggestionsView: View {
                         if index > 0 {
                             RowRule().padding(.leading, 68)
                         }
-                        NavigationLink {
-                            BillDetailView(client: client, bill: bill, status: nil)
-                        } label: {
-                            BillRow(
-                                bill: bill,
-                                line: "Around the \(BillSchedule.ordinalDay(bill.expectedDayOfMonth))",
-                                lineColor: Theme.muted
-                            )
+                        HStack(spacing: 0) {
+                            NavigationLink {
+                                BillDetailView(client: client, model: model, bill: bill, status: nil)
+                            } label: {
+                                BillRow(
+                                    bill: bill,
+                                    line: "Monthly, \(BillSchedule.ordinalDay(bill.expectedDayOfMonth))",
+                                    lineColor: Theme.muted
+                                )
+                            }
+                            .buttonStyle(RowButtonStyle())
+                            Button("Track") {
+                                Task { await model.setTracked(true, bill) }
+                            }
+                            .buttonStyle(ChipButtonStyle())
+                            .disabled(model.changing.contains(bill.id))
+                            .accessibilityLabel("Track \(bill.title)")
+                            .padding(.trailing, 12)
                         }
-                        .buttonStyle(RowButtonStyle())
                     }
                 }
                 .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
@@ -262,6 +299,38 @@ private struct SuggestionsView: View {
         .screenBackground()
         .navigationTitle("Suggested")
         .navigationBarTitleDisplayMode(.inline)
+        .billActionAlert(model)
+    }
+}
+
+/// A small grey pill for an action inside a row.
+private struct ChipButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(Theme.smallStrong)
+            .foregroundStyle(Theme.text)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 36)
+            .background(Theme.raised, in: .capsule)
+            .frame(minHeight: 44)
+            .contentShape(.rect)
+            .opacity(isEnabled ? (configuration.isPressed ? 0.6 : 1) : 0.35)
+    }
+}
+
+private extension View {
+    /// Says why a change to a bill did not go through.
+    func billActionAlert(_ model: BillsModel) -> some View {
+        alert(
+            "That did not work",
+            isPresented: Binding(get: { model.actionError != nil }, set: { if !$0 { model.actionError = nil } })
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(model.actionError ?? "")
+        }
     }
 }
 
@@ -270,6 +339,7 @@ private struct SuggestionsView: View {
 /// A block of bills with their standing this month. Each opens its detail.
 struct BillRows: View {
     let client: APIClient
+    let model: BillsModel
     let statuses: [BillStatus]
 
     var body: some View {
@@ -279,7 +349,7 @@ struct BillRows: View {
                     RowRule().padding(.leading, 68)
                 }
                 NavigationLink {
-                    BillDetailView(client: client, bill: status.bill, status: status)
+                    BillDetailView(client: client, model: model, bill: status.bill, status: status)
                 } label: {
                     BillRow(status: status)
                 }
@@ -351,9 +421,15 @@ struct BillRow: View {
 
 struct BillDetailView: View {
     let client: APIClient
+    let model: BillsModel
     let bill: Bill
     /// Where it stands this month. Nil for suggestions and odd schedules.
     let status: BillStatus?
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var confirmingStop = false
+
+    private var isChanging: Bool { model.changing.contains(bill.id) }
 
     private var notes: String? {
         guard let text = bill.notes?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
@@ -481,6 +557,24 @@ struct BillDetailView: View {
                 }
                 .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
                 .clipShape(.rect(cornerRadius: Theme.cardRadius))
+
+                if bill.isSuggestion {
+                    Button(isChanging ? "Tracking…" : "Track this bill") {
+                        Task {
+                            if await model.setTracked(true, bill) { dismiss() }
+                        }
+                    }
+                    .buttonStyle(PrimaryButtonStyle(fullWidth: true))
+                    .disabled(isChanging)
+                } else if bill.isActive {
+                    Button(isChanging ? "Stopping…" : "Stop tracking") {
+                        confirmingStop = true
+                    }
+                    .font(Theme.bodyStrong)
+                    .foregroundStyle(Theme.negative)
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .disabled(isChanging)
+                }
             }
             .padding(.horizontal, Theme.margin)
             .padding(.bottom, 24)
@@ -488,6 +582,20 @@ struct BillDetailView: View {
         .screenBackground()
         .navigationTitle(bill.isIncome ? "Money in" : "Bill")
         .navigationBarTitleDisplayMode(.inline)
+        .billActionAlert(model)
+        .confirmationDialog(
+            "Stop tracking \(bill.title)?",
+            isPresented: $confirmingStop,
+            titleVisibility: .visible
+        ) {
+            Button("Stop tracking", role: .destructive) {
+                Task {
+                    if await model.setTracked(false, bill) { dismiss() }
+                }
+            }
+        } message: {
+            Text("It leaves your bills. Your transactions are not changed.")
+        }
     }
 
     private static func color(for status: BillStatus) -> Color {

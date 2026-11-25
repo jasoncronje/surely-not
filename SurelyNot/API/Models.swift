@@ -266,6 +266,16 @@ nonisolated struct Bill: Decodable, Sendable, Identifiable, Hashable {
     }
 }
 
+/// Body for changing whether a repeating payment is tracked as a bill.
+nonisolated struct BillUpdate: Encodable, Sendable {
+    nonisolated struct Fields: Encodable, Sendable {
+        /// `active` to track it, `inactive` to stop.
+        let status: String
+    }
+
+    let recurringTransaction: Fields
+}
+
 // MARK: - Overview
 
 nonisolated struct Money: Decodable, Sendable {

@@ -303,6 +303,12 @@ extension APIClient {
         return page.items
     }
 
+    /// Starts or stops tracking a repeating payment as a bill.
+    func setBill(id: String, tracked: Bool) async throws {
+        let body = BillUpdate(recurringTransaction: .init(status: tracked ? "active" : "inactive"))
+        try await sendDiscardingResponse("PATCH", "recurring_transactions/\(id)", body: body)
+    }
+
     func createTransaction(_ input: TransactionInput) async throws -> Transaction {
         try await send("POST", "transactions", body: TransactionEnvelope(transaction: input))
     }
