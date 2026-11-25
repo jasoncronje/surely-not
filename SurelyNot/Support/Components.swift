@@ -241,18 +241,23 @@ struct PaceBar: View {
     }
 }
 
-/// The main action of a screen: a near-black pill.
+/// The main action of a screen: a near-black pill, or red when the action
+/// deletes or removes something.
 struct PrimaryButtonStyle: ButtonStyle {
     var fullWidth = false
+    var isDestructive = false
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(Theme.bodyStrong)
-            .foregroundStyle(Theme.onPrimary)
+            .foregroundStyle(isDestructive ? Color.white : Theme.onPrimary)
             .padding(.horizontal, 18)
             .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: fullWidth ? 52 : 44)
-            .background(Theme.primary, in: .rect(cornerRadius: fullWidth ? Theme.controlRadius : 22))
+            .background(
+                isDestructive ? Theme.negative : Theme.primary,
+                in: .rect(cornerRadius: fullWidth ? Theme.controlRadius : 22)
+            )
             .opacity(isEnabled ? (configuration.isPressed ? 0.8 : 1) : 0.35)
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
             .animation(.snappy(duration: 0.15), value: configuration.isPressed)
@@ -286,7 +291,101 @@ struct EmptyNote: View {
     }
 }
 
+/// Asks before something that is hard to take back: a title, a line on what
+/// happens, optional choices, then the action and Cancel. The app's own sheet,
+/// sized to fit, used instead of the system's confirmation dialog.
+struct ConfirmSheet<Options: View>: View {
+    let title: String
+    var message: String?
+    let confirmTitle: String
+    var isDestructive = true
+    let confirm: () -> Void
+    @ViewBuilder var options: Options
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var height: CGFloat = 300
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title)
+                    .font(Theme.section)
+                    .foregroundStyle(Theme.text)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+                if let message {
+                    Text(message)
+                        .font(Theme.body)
+                        .foregroundStyle(Theme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            options
+
+            VStack(spacing: 4) {
+                Button(confirmTitle) {
+                    dismiss()
+                    confirm()
+                }
+                .buttonStyle(PrimaryButtonStyle(fullWidth: true, isDestructive: isDestructive))
+                Button("Cancel") { dismiss() }
+                    .font(Theme.bodyStrong)
+                    .foregroundStyle(Theme.text)
+                    .frame(maxWidth: .infinity, minHeight: 48)
+            }
+            .animation(.snappy(duration: 0.2), value: isDestructive)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 28)
+        .padding(.bottom, 8)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+        .presentationDetents([.height(height)])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Theme.ground)
+        .presentationCornerRadius(32)
+    }
+}
+
+extension ConfirmSheet where Options == EmptyView {
+    init(
+        title: String,
+        message: String? = nil,
+        confirmTitle: String,
+        isDestructive: Bool = true,
+        confirm: @escaping () -> Void
+    ) {
+        self.init(
+            title: title,
+            message: message,
+            confirmTitle: confirmTitle,
+            isDestructive: isDestructive,
+            confirm: confirm
+        ) { EmptyView() }
+    }
+}
+
 extension View {
+    /// Shows a `ConfirmSheet` while `isPresented` is true.
+    func confirmSheet(
+        _ title: String,
+        isPresented: Binding<Bool>,
+        message: String? = nil,
+        confirmTitle: String,
+        isDestructive: Bool = true,
+        confirm: @escaping () -> Void
+    ) -> some View {
+        sheet(isPresented: isPresented) {
+            ConfirmSheet(
+                title: title,
+                message: message,
+                confirmTitle: confirmTitle,
+                isDestructive: isDestructive,
+                confirm: confirm
+            )
+        }
+    }
+
     /// The page background and default type for a screen.
     func screenBackground() -> some View {
         background(Theme.ground.ignoresSafeArea())

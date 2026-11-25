@@ -226,22 +226,18 @@ struct WalletView: View {
 /// Asks how to disconnect: keep what Sure imported, or remove it too.
 struct WalletDisconnectSheet: View {
     @Environment(WalletSync.self) private var wallet
-    @Environment(\.dismiss) private var dismiss
     @State private var removing = false
-    @State private var height: CGFloat = 420
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Disconnect Apple Wallet?")
-                    .font(Theme.section)
-                    .foregroundStyle(Theme.text)
-                    .accessibilityAddTraits(.isHeader)
-                Text("Sure stops getting new activity from Wallet.")
-                    .font(Theme.body)
-                    .foregroundStyle(Theme.muted)
-            }
-
+        ConfirmSheet(
+            title: "Disconnect Apple Wallet?",
+            message: "Sure stops getting new activity from Wallet.",
+            confirmTitle: removing ? "Disconnect and remove" : "Disconnect",
+            isDestructive: removing
+        ) {
+            let remove = removing
+            Task { await wallet.disconnect(removingImported: remove) }
+        } options: {
             if wallet.serverCanDiscard {
                 VStack(spacing: 0) {
                     choice(
@@ -256,31 +252,9 @@ struct WalletDisconnectSheet: View {
                         isOn: removing
                     ) { removing = true }
                 }
-                .background(Theme.surface, in: .rect(cornerRadius: 16))
+                .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
             }
-
-            VStack(spacing: 4) {
-                Button(removing ? "Disconnect and remove" : "Disconnect") {
-                    let remove = removing
-                    dismiss()
-                    Task { await wallet.disconnect(removingImported: remove) }
-                }
-                .buttonStyle(DisconnectButtonStyle(isDestructive: removing))
-                Button("Cancel") { dismiss() }
-                    .font(Theme.bodyStrong)
-                    .foregroundStyle(Theme.text)
-                    .frame(maxWidth: .infinity, minHeight: 48)
-            }
-            .animation(.snappy(duration: 0.2), value: removing)
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 28)
-        .padding(.bottom, 8)
-        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
-        .presentationDetents([.height(height)])
-        .presentationDragIndicator(.visible)
-        .presentationBackground(Theme.ground)
-        .presentationCornerRadius(32)
     }
 
     private func choice(_ title: String, detail: String, isOn: Bool, select: @escaping () -> Void) -> some View {
@@ -307,22 +281,6 @@ struct WalletDisconnectSheet: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isOn ? .isSelected : [])
-    }
-}
-
-/// The confirming button: neutral to disconnect, red once removal is chosen.
-private struct DisconnectButtonStyle: ButtonStyle {
-    let isDestructive: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(Theme.bodyStrong)
-            .foregroundStyle(isDestructive ? Color.white : Theme.onPrimary)
-            .frame(maxWidth: .infinity, minHeight: 52)
-            .background(isDestructive ? Theme.negative : Theme.primary, in: .rect(cornerRadius: Theme.controlRadius))
-            .opacity(configuration.isPressed ? 0.8 : 1)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .animation(.snappy(duration: 0.15), value: configuration.isPressed)
     }
 }
 

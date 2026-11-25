@@ -172,15 +172,13 @@ struct TransactionEditor: View {
                         .disabled(!canSave)
                 }
             }
-            .confirmationDialog(
+            .confirmSheet(
                 "Delete this transaction?",
                 isPresented: $confirmingDelete,
-                titleVisibility: .visible
-            ) {
-                Button("Delete", role: .destructive, action: delete)
-            } message: {
-                Text("This cannot be undone.")
-            }
+                message: "This cannot be undone.",
+                confirmTitle: "Delete",
+                confirm: delete
+            )
             .interactiveDismissDisabled(isWorking)
             .task { await loadCategories() }
             .task { await loadAccounts() }

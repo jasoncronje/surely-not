@@ -597,18 +597,15 @@ struct BillDetailView: View {
         .navigationTitle(bill.isIncome ? "Money in" : "Bill")
         .navigationBarTitleDisplayMode(.inline)
         .billActionAlert(model)
-        .confirmationDialog(
+        .confirmSheet(
             "Stop tracking \(bill.title)?",
             isPresented: $confirmingStop,
-            titleVisibility: .visible
+            message: "It leaves your bills. Your transactions are not changed.",
+            confirmTitle: "Stop tracking"
         ) {
-            Button("Stop tracking", role: .destructive) {
-                Task {
-                    if await model.setTracked(false, bill) { dismiss() }
-                }
+            Task {
+                if await model.setTracked(false, bill) { dismiss() }
             }
-        } message: {
-            Text("It leaves your bills. Your transactions are not changed.")
         }
     }
 

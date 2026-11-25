@@ -49,6 +49,7 @@ struct ChatListView: View {
     @State private var model: ChatListModel
     @State private var path: [ChatRoute] = []
     @State private var renaming: Chat?
+    @State private var deleting: Chat?
     @State private var newTitle = ""
 
     init(client: APIClient) {
@@ -108,6 +109,15 @@ struct ChatListView: View {
                     }
                 }
             }
+            .sheet(item: $deleting) { chat in
+                ConfirmSheet(
+                    title: "Delete \u{201C}\(chat.title)\u{201D}?",
+                    message: "The whole conversation goes. This cannot be undone.",
+                    confirmTitle: "Delete chat"
+                ) {
+                    Task { await model.delete(chat) }
+                }
+            }
             .alert("That did not work", isPresented: actionErrorShown) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -133,7 +143,7 @@ struct ChatListView: View {
                     renaming = chat
                 }
                 Button("Delete", systemImage: "trash", role: .destructive) {
-                    Task { await model.delete(chat) }
+                    deleting = chat
                 }
             } label: {
                 Image(systemName: "ellipsis")
