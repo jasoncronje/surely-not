@@ -6,6 +6,10 @@ An iPhone app for [Sure](https://github.com/we-promise/sure), the free money app
 
 If you use Sure, this puts it on your phone.
 
+## Take a look
+
+![Five screens from Surely Not: Home, Bills, Activity, Plan and Chat](docs/screens.png)
+
 ## What you can do
 
 - **See your money at a glance.** Net worth, what came in and what went out this month.

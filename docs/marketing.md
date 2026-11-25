@@ -33,6 +33,18 @@ Surely Not is a native iPhone app for Sure, the open source finance app you host
 - Budgets and most accounts are read-only; change them in Sure on the web.
 - Unofficial: not made by, endorsed by or affiliated with the Sure project or Maybe Finance.
 
+## Screens image
+
+`docs/screens.png`, 2400 × 1330, shown in the README. Real screens from the app's sample data, with captions:
+
+- **Your month at a glance.** Net worth, spending, and how it compares with last month.
+- **What's left to pay.** Every bill this month, paid or due.
+- **Every transaction.** Search, filter and change categories.
+- **Your budget.** How each category is doing this month.
+- **Ask about it.** Ask Sure's assistant where it went.
+
+Headline: Your Sure server, made for your iPhone.
+
 ## Social preview
 
 `docs/social-preview.png`, 1280 × 640. Upload it under the repo's Settings → General → Social preview.
