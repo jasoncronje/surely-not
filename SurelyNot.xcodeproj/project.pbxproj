@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		09805744FF0483A8F69BC515 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E9480CCBDB77A763941886 /* Components.swift */; };
 		0F20215173E31C9A536017DB /* Manrope.ttf in Resources */ = {isa = PBXBuildFile; fileRef = E106363FDAD77D35497D5B88 /* Manrope.ttf */; };
+		104CA452475FA649CE3B213C /* AppLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 908802C8497D49ABD5D968A7 /* AppLock.swift */; };
 		28957104507D200E30CDAD0E /* Loadable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F6903F5AA072F86CBEA25AA /* Loadable.swift */; };
 		2A26EF20E625BBDFE7B6793B /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 420741FF433093804B339E02 /* APIClient.swift */; };
 		2C381A4D0F5DC96E7C22C894 /* BudgetsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D96F0F121585BF7159D31929 /* BudgetsView.swift */; };
@@ -64,6 +65,7 @@
 		80AF54CB4A9073279245C20C /* SurelyNotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SurelyNotTests.swift; sourceTree = "<group>"; };
 		85971A5B7BA26CF6C5F4A100 /* OverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewView.swift; sourceTree = "<group>"; };
 		86D0CF2AC0975810E329A155 /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
+		908802C8497D49ABD5D968A7 /* AppLock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLock.swift; sourceTree = "<group>"; };
 		9E13AC36A71B55988EE71E12 /* MarkdownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownView.swift; sourceTree = "<group>"; };
 		A5EEC08EE2D2693F9F237EEC /* ChatListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatListView.swift; sourceTree = "<group>"; };
 		AC584E56DBBB28E780122466 /* TransactionEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionEditor.swift; sourceTree = "<group>"; };
@@ -159,6 +161,7 @@
 		74CB5798410973B6428A55C5 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				908802C8497D49ABD5D968A7 /* AppLock.swift */,
 				64B618A1EA8F36504E4AA12B /* SurelyNotApp.swift */,
 			);
 			path = App;
@@ -327,6 +330,7 @@
 				2A26EF20E625BBDFE7B6793B /* APIClient.swift in Sources */,
 				2C56BD7883E3748504DA0948 /* AccountDetailView.swift in Sources */,
 				412199E930B7A2A295098EB7 /* AccountsView.swift in Sources */,
+				104CA452475FA649CE3B213C /* AppLock.swift in Sources */,
 				8C440361E94BC4B6DA1D068D /* BillSchedule.swift in Sources */,
 				DCD06C8B9E346EA35F131828 /* BillsView.swift in Sources */,
 				2C381A4D0F5DC96E7C22C894 /* BudgetsView.swift in Sources */,

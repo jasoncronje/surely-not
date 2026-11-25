@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct SurelyNotApp: App {
     @State private var session = Session()
+    @State private var lock = AppLock()
 
     init() {
         Theme.applyBarAppearance()
@@ -19,7 +20,11 @@ struct SurelyNotApp: App {
                     SignInView()
                 }
             }
+            // Nothing shows under the cover, even for the first frame of a cold start.
+            .opacity(lock.cover == .none ? 1 : 0)
             .environment(session)
+            .environment(lock)
+            .task { lock.start() }
             .font(Theme.body)
             // Controls stay neutral. Colour is kept for the data.
             .tint(Theme.text)
@@ -81,7 +86,22 @@ struct MainTabView: View {
 
 struct SettingsView: View {
     @Environment(Session.self) private var session
+    @Environment(AppLock.self) private var lock
     @Environment(\.dismiss) private var dismiss
+
+    /// The switch follows the lock; flipping it asks before anything changes.
+    private var lockIsOn: Binding<Bool> {
+        Binding(get: { lock.isEnabled }, set: { wanted in
+            Task { await lock.setEnabled(wanted) }
+        })
+    }
+
+    private var lockErrorShown: Binding<Bool> {
+        Binding(
+            get: { !(lock.error ?? "").isEmpty },
+            set: { if !$0 { lock.error = nil } }
+        )
+    }
 
     var body: some View {
         NavigationStack {
@@ -102,6 +122,19 @@ struct SettingsView: View {
                         RowRule()
                         FigureRow(label: "Server", value: session.serverURL?.host() ?? "Not signed in")
                     }
+                    Card {
+                        Toggle(isOn: lockIsOn) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Lock with \(lock.methodName)")
+                                    .font(Theme.bodyStrong)
+                                    .foregroundStyle(Theme.text)
+                                Text("Asks when you open the app, and after a minute away.")
+                                    .font(Theme.small)
+                                    .foregroundStyle(Theme.muted)
+                            }
+                        }
+                        .tint(Theme.accent)
+                    }
                     Button("Sign out") {
                         session.signOut()
                     }
@@ -116,6 +149,11 @@ struct SettingsView: View {
             .screenBackground()
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
+            .alert("The lock was not changed", isPresented: lockErrorShown) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(lock.error ?? "")
+            }
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }

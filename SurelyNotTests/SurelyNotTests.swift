@@ -488,6 +488,29 @@ private func decode<T: Decodable>(_ type: T.Type, _ json: String) throws -> T {
     }
 }
 
+@Suite struct AppLockTests {
+    @Test func aShortTripAwayDoesNotAskAgain() {
+        #expect(!AppLock.needsUnlock(awayFor: 5))
+        #expect(!AppLock.needsUnlock(awayFor: 59))
+    }
+
+    @Test func aMinuteAwayAsksAgain() {
+        #expect(AppLock.needsUnlock(awayFor: 60))
+        #expect(AppLock.needsUnlock(awayFor: 3600))
+    }
+
+    @Test @MainActor func theLockStartsOffAndCoversWhenOn() throws {
+        let name = "AppLockTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        #expect(AppLock(defaults: defaults).cover == .none)
+        defaults.set(true, forKey: "appLockEnabled")
+        let lock = AppLock(defaults: defaults)
+        #expect(lock.isEnabled)
+        #expect(lock.cover == .locked)
+    }
+}
+
 @Suite struct BillTests {
     private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
