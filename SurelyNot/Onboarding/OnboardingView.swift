@@ -39,7 +39,7 @@ struct WelcomeView: View {
 
     static let sureProject = URL(string: "https://github.com/we-promise/sure")!
 
-    /// The pitch, with "Sure" linking to the project for anyone new to it.
+    /// One sentence on what this is, with "Sure" linking to the project.
     private static var pitch: AttributedString {
         var text = AttributedString("An iPhone app for ")
         var sure = AttributedString("Sure")
@@ -47,16 +47,17 @@ struct WelcomeView: View {
         sure.underlineStyle = .single
         sure.foregroundColor = Theme.text
         text += sure
-        text += AttributedString(", the open source finance app you host yourself. Your money stays on your server.")
+        text += AttributedString(", the finance app you host yourself.")
         return text
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 18) {
-                ProductMark(size: 44)
+            VStack(alignment: .leading, spacing: 16) {
+                ProductMark(size: 36)
+                    .padding(.bottom, 8)
                 Text("Your money,\nin your pocket.")
-                    .font(Theme.font(34, .bold, relativeTo: .largeTitle))
+                    .font(Theme.font(38, .bold, relativeTo: .largeTitle))
                     .foregroundStyle(Theme.text)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(Self.pitch)
@@ -65,42 +66,28 @@ struct WelcomeView: View {
                     .tint(Theme.text)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.top, 48)
+            .padding(.top, 40)
             .opacity(shown ? 1 : 0)
             .offset(y: shown ? 0 : 12)
 
-            Spacer(minLength: 24)
+            Spacer(minLength: 32)
 
             WelcomePreview(shown: shown)
                 .accessibilityHidden(true)
 
-            Spacer(minLength: 24)
+            Spacer(minLength: 32)
 
-            VStack(spacing: 6) {
+            VStack(spacing: 4) {
                 Button("Connect my server", action: connect)
                     .buttonStyle(PrimaryButtonStyle(fullWidth: true))
                 Button(action: lookAround) {
-                    Text("Look around with sample data")
+                    Text("Try it with sample data")
                         .font(Theme.bodyStrong)
                         .foregroundStyle(Theme.text)
                         .frame(maxWidth: .infinity, minHeight: 48)
                         .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                Link(destination: Self.sureProject) {
-                    HStack(spacing: 4) {
-                        Text("New to Sure? See the project")
-                        Image(systemName: "arrow.up.right")
-                            .font(.system(size: 11, weight: .semibold))
-                    }
-                    .font(Theme.smallStrong)
-                    .foregroundStyle(Theme.muted)
-                    .frame(minHeight: 32)
-                }
-                Text("An unofficial app, not affiliated with the Sure project.")
-                    .font(Theme.small)
-                    .foregroundStyle(Theme.muted)
-                    .multilineTextAlignment(.center)
             }
             .opacity(shown ? 1 : 0)
         }
@@ -116,8 +103,8 @@ struct WelcomeView: View {
     }
 }
 
-/// Two cards from the app itself, a net worth that rises and this month's
-/// bills, so the welcome shows the product instead of describing it.
+/// One card from the app itself: a net worth that rises over the year, so
+/// the welcome shows the product instead of describing it.
 private struct WelcomePreview: View {
     let shown: Bool
 
@@ -128,64 +115,32 @@ private struct WelcomePreview: View {
     private let target = 84_210.0
 
     var body: some View {
-        VStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Net worth")
-                    .font(Theme.small)
-                    .foregroundStyle(Theme.muted)
-                Text(worth, format: .currency(code: "USD").precision(.fractionLength(0)))
-                    .font(Theme.font(32, .semibold, relativeTo: .largeTitle))
-                    .foregroundStyle(Theme.text)
-                    .contentTransition(.numericText(value: worth))
-                    .monospacedDigit()
-                HStack(alignment: .bottom, spacing: 5) {
-                    ForEach(heights.indices, id: \.self) { index in
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(index == heights.count - 1 ? Theme.accent : Theme.accent.opacity(0.22))
-                            .frame(height: shown ? 56 * heights[index] : 4)
-                            .animation(
-                                reduceMotion ? nil : .spring(duration: 0.6, bounce: 0.25).delay(0.25 + Double(index) * 0.05),
-                                value: shown
-                            )
-                    }
-                }
-                .frame(height: 56, alignment: .bottom)
-            }
-            .padding(Theme.cardPadding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
-
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Still to pay")
-                        .font(Theme.small)
-                        .foregroundStyle(Theme.muted)
-                    Text("$214")
-                        .font(Theme.font(22, .semibold, relativeTo: .title2))
-                        .foregroundStyle(Theme.text)
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 6) {
-                    Text("7 of 11 bills paid")
-                        .font(Theme.small)
-                        .foregroundStyle(Theme.muted)
-                    Capsule()
-                        .fill(Theme.track)
-                        .frame(width: 110, height: 6)
-                        .overlay(alignment: .leading) {
-                            Capsule()
-                                .fill(Theme.positive)
-                                .frame(width: shown ? 70 : 0, height: 6)
-                                .animation(reduceMotion ? nil : .smooth(duration: 0.8).delay(0.7), value: shown)
-                        }
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Net worth")
+                .font(Theme.small)
+                .foregroundStyle(Theme.muted)
+            Text(worth, format: .currency(code: "USD").precision(.fractionLength(0)))
+                .font(Theme.font(34, .semibold, relativeTo: .largeTitle))
+                .foregroundStyle(Theme.text)
+                .contentTransition(.numericText(value: worth))
+                .monospacedDigit()
+            HStack(alignment: .bottom, spacing: 6) {
+                ForEach(heights.indices, id: \.self) { index in
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(index == heights.count - 1 ? Theme.accent : Theme.accent.opacity(0.22))
+                        .frame(height: shown ? 72 * heights[index] : 4)
+                        .animation(
+                            reduceMotion ? nil : .spring(duration: 0.6, bounce: 0.25).delay(0.25 + Double(index) * 0.05),
+                            value: shown
+                        )
                 }
             }
-            .padding(Theme.cardPadding)
-            .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
-            .opacity(shown ? 1 : 0)
-            .offset(y: shown ? 0 : 16)
-            .animation(reduceMotion ? nil : .smooth(duration: 0.6).delay(0.45), value: shown)
+            .frame(height: 72, alignment: .bottom)
+            .padding(.top, 16)
         }
+        .padding(Theme.cardPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
         .onChange(of: shown, initial: true) {
             guard shown else { return }
             if reduceMotion {
