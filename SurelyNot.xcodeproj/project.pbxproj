@@ -20,6 +20,7 @@
 		2CC2D15068ED6F0ED2900025 /* ChatListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5EEC08EE2D2693F9F237EEC /* ChatListView.swift */; };
 		30E85EAA45901F1D97A5ACCF /* WalletTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBA4DE44672E0098B35C6995 /* WalletTests.swift */; };
 		32F4AF9CFD8C33FDE6E9ED7F /* InvestmentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA557AD334CA69BC5514524F /* InvestmentsView.swift */; };
+		37E6CC1DFD267E7BDD8A99DD /* WalletDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = D98487EC84861CFF7C7A4544 /* WalletDemo.swift */; };
 		408A945C24F6B74C0723814C /* FinanceKitSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CE0D60A1B226217694B54F0 /* FinanceKitSource.swift */; };
 		412199E930B7A2A295098EB7 /* AccountsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0938E34FBAE12B653508F4CE /* AccountsView.swift */; };
 		45497040DCBCCA45226F1337 /* BillReminders.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6EB416CB2EDA61AD76880D4 /* BillReminders.swift */; };
@@ -131,6 +132,7 @@
 		D5C68D1CDFE51092A71932C1 /* WalletSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletSync.swift; sourceTree = "<group>"; };
 		D9293F1B6360A257BE14C41E /* CategoryChanger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryChanger.swift; sourceTree = "<group>"; };
 		D96F0F121585BF7159D31929 /* BudgetsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BudgetsView.swift; sourceTree = "<group>"; };
+		D98487EC84861CFF7C7A4544 /* WalletDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletDemo.swift; sourceTree = "<group>"; };
 		DBA4DE44672E0098B35C6995 /* WalletTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletTests.swift; sourceTree = "<group>"; };
 		DCBE6A8349BA4D7B954E2963 /* Wallet.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Wallet.entitlements; sourceTree = "<group>"; };
 		DFEF98CDE2694B1ABF5CD3E3 /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
@@ -361,6 +363,7 @@
 			isa = PBXGroup;
 			children = (
 				6CE0D60A1B226217694B54F0 /* FinanceKitSource.swift */,
+				D98487EC84861CFF7C7A4544 /* WalletDemo.swift */,
 				5B6C4A617B356117CE5954D1 /* WalletServer.swift */,
 				BD0FEF96924E581F17FD3F6C /* WalletSource.swift */,
 				482C04775D0FD66092BC7CB6 /* WalletStore.swift */,
@@ -507,6 +510,7 @@
 				7857E4116C4AD43E420F72AC /* TransactionEditor.swift in Sources */,
 				F4E4115D28A61ED03798E3CF /* TransactionFilter.swift in Sources */,
 				F9B111C54F55FD2EB22A3A16 /* TransactionsView.swift in Sources */,
+				37E6CC1DFD267E7BDD8A99DD /* WalletDemo.swift in Sources */,
 				7B86B11DBDB8FAE9AA4C1644 /* WalletServer.swift in Sources */,
 				6089D55B937A8825D2B96871 /* WalletSource.swift in Sources */,
 				1EE5D6A569E2200D9686A7EA /* WalletStore.swift in Sources */,

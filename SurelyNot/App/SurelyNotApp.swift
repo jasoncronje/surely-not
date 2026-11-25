@@ -13,13 +13,15 @@ struct SurelyNotApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if let client = session.client {
-                    MainTabView(client: client, signIn: session.signInMethod)
-                        // A new sign-in gets fresh screens with no data from the last one.
-                        .id(ObjectIdentifier(client))
+                #if DEBUG
+                if let mode = WalletDemo.mode {
+                    WalletDemoRoot(mode: mode)
                 } else {
-                    SignInView()
+                    root
                 }
+                #else
+                root
+                #endif
             }
             // Nothing shows under the cover, even for the first frame of a cold start.
             .opacity(lock.cover == .none ? 1 : 0)
@@ -40,6 +42,17 @@ struct SurelyNotApp: App {
             if let client = await session.client {
                 await WidgetFeed.refresh(client: client)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var root: some View {
+        if let client = session.client {
+            MainTabView(client: client, signIn: session.signInMethod)
+                // A new sign-in gets fresh screens with no data from the last one.
+                .id(ObjectIdentifier(client))
+        } else {
+            SignInView()
         }
     }
 }

@@ -26,7 +26,7 @@ struct WalletView: View {
                     }
                     // A connection made earlier can still be closed.
                     if wallet.isConnected {
-                        disconnectButton
+                        disconnectCard
                     }
                 case .ready:
                     if let link = wallet.link {
@@ -37,6 +37,7 @@ struct WalletView: View {
                 }
             }
             .padding(.horizontal, Theme.margin)
+            .padding(.top, 8)
             .padding(.bottom, Theme.bottomRoom)
         }
         .screenBackground()
@@ -46,23 +47,6 @@ struct WalletView: View {
         .refreshable { await wallet.refresh() }
         .sheet(isPresented: $isSettingUp) {
             WalletSetupView(client: client)
-        }
-        .confirmationDialog(
-            "Disconnect Apple Wallet?",
-            isPresented: $isConfirmingDisconnect,
-            titleVisibility: .visible
-        ) {
-            Button("Disconnect and keep what was imported") {
-                Task { await wallet.disconnect(removingImported: false) }
-            }
-            if wallet.serverCanDiscard {
-                Button("Disconnect and remove what was imported", role: .destructive) {
-                    Task { await wallet.disconnect(removingImported: true) }
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Sure stops getting new Wallet activity. Removing what was imported cannot be undone.")
         }
     }
 
@@ -88,10 +72,20 @@ struct WalletView: View {
     @ViewBuilder
     private func connected(_ link: WalletLink) -> some View {
         Card {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(link.accounts.count == 1 ? "1 account connected" : "\(link.accounts.count) accounts connected")
+                    .font(Theme.section)
+                    .foregroundStyle(Theme.text)
+                if let host {
+                    Text("Sending to \(host)")
+                        .font(Theme.small)
+                        .foregroundStyle(Theme.muted)
+                }
+            }
             VStack(spacing: 14) {
                 ForEach(link.accounts) { account in
                     HStack(spacing: 12) {
-                        LetterTile(name: account.name, tint: Tint(name: account.name), round: true)
+                        WalletAccountIcon(isLiability: account.isLiability)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(account.name)
                                 .font(Theme.body)
@@ -100,15 +94,24 @@ struct WalletView: View {
                             Text(account.reportedUnavailable ? "No longer shared from Wallet"
                                 : account.isLiability ? "Credit card" : "Cash")
                                 .font(Theme.small)
-                                .foregroundStyle(Theme.muted)
+                                .foregroundStyle(account.reportedUnavailable ? Theme.warning : Theme.muted)
                         }
                         Spacer(minLength: 0)
                     }
                     .accessibilityElement(children: .combine)
                 }
             }
-            RowRule()
-            FigureRow(label: "Last synced", value: lastSynced(link))
+        }
+
+        Card {
+            VStack(alignment: .leading, spacing: 4) {
+                FigureRow(label: "Last synced", value: lastSynced(link))
+                if let outcome = syncOutcome {
+                    Text(outcome)
+                        .font(Theme.small)
+                        .foregroundStyle(Theme.muted)
+                }
+            }
             if !link.outbox.isEmpty {
                 FigureRow(
                     label: "Waiting to upload",
@@ -129,16 +132,9 @@ struct WalletView: View {
                 }
                 .buttonStyle(PrimaryButtonStyle(fullWidth: true))
             }
-            if let outcome = wallet.lastOutcome, !wallet.isWorking {
-                Text(outcome)
-                    .font(Theme.small)
-                    .foregroundStyle(Theme.muted)
-                if let reading = wallet.lastReading {
-                    Text(reading)
-                        .font(Theme.small)
-                        .foregroundStyle(Theme.muted)
-                }
-            }
+            Text("Wallet syncs when you open the app and when you tap Sync now, not while the app is closed.")
+                .font(Theme.small)
+                .foregroundStyle(Theme.muted)
         }
 
         if let why = wallet.repairNeeded {
@@ -181,22 +177,49 @@ struct WalletView: View {
             .buttonStyle(.plain)
         }
 
-        Text("Wallet syncs when you open the app and when you tap Sync now. It does not sync while the app is closed.")
-            .font(Theme.small)
-            .foregroundStyle(Theme.muted)
-            .padding(.horizontal, 4)
-
-        disconnectButton
+        disconnectCard
+            .padding(.top, 16)
     }
 
-    private var disconnectButton: some View {
-        Button("Disconnect Apple Wallet") {
-            isConfirmingDisconnect = true
+    /// What the last sync did and what Wallet handed over, as one line.
+    private var syncOutcome: String? {
+        guard !wallet.isWorking, let outcome = wallet.lastOutcome else { return nil }
+        guard let reading = wallet.lastReading else { return outcome }
+        return "\(outcome) \(reading)"
+    }
+
+    private var disconnectCard: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 4) {
+                Button("Disconnect Apple Wallet") {
+                    isConfirmingDisconnect = true
+                }
+                .font(Theme.bodyStrong)
+                .foregroundStyle(Theme.negative)
+                .disabled(wallet.isWorking)
+                // Anchored here, so on iOS 26 the choices open from this button.
+                .confirmationDialog(
+                    "Disconnect Apple Wallet?",
+                    isPresented: $isConfirmingDisconnect,
+                    titleVisibility: .visible
+                ) {
+                    Button("Disconnect, keep imported data") {
+                        Task { await wallet.disconnect(removingImported: false) }
+                    }
+                    if wallet.serverCanDiscard {
+                        Button("Disconnect and remove imported data", role: .destructive) {
+                            Task { await wallet.disconnect(removingImported: true) }
+                        }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Sure stops getting new Wallet activity. Removing what was imported cannot be undone.")
+                }
+                Text("Sure stops getting new activity. You choose whether to keep what it already has.")
+                    .font(Theme.small)
+                    .foregroundStyle(Theme.muted)
+            }
         }
-        .font(Theme.bodyStrong)
-        .foregroundStyle(Theme.negative)
-        .frame(maxWidth: .infinity, minHeight: 44)
-        .disabled(wallet.isWorking)
     }
 
     @ViewBuilder
@@ -214,6 +237,21 @@ struct WalletView: View {
         return date.formatted(.relative(presentation: .named))
     }
 }
+
+/// A Wallet account's kind, as a quiet round icon: a card or cash.
+struct WalletAccountIcon: View {
+    let isLiability: Bool
+
+    var body: some View {
+        Image(systemName: isLiability ? "creditcard" : "banknote")
+            .font(.system(size: 16, weight: .medium))
+            .foregroundStyle(Theme.text)
+            .frame(width: 40, height: 40)
+            .background(Theme.raised, in: .circle)
+            .accessibilityHidden(true)
+    }
+}
+
 
 /// The way in to Wallet sync from the Accounts screen.
 struct WalletEntryRow: View {
@@ -267,6 +305,15 @@ struct WalletSetupView: View {
 
         var id: String { rawValue }
 
+        /// What the choice means, under its name.
+        var detail: String {
+            switch self {
+            case .everything: "All the history Wallet holds."
+            case .recent: "From three months ago onwards."
+            case .fromNow: "Nothing before today. Pick this if Sure already has these transactions, or they will show up twice."
+            }
+        }
+
         func start(now: Date = .now, calendar: Calendar = .current) -> Date? {
             switch self {
             case .everything: nil
@@ -288,63 +335,48 @@ struct WalletSetupView: View {
     @State private var targets: [String: String] = [:]
     @State private var history = History.everything
 
+    private var host: String? { client.baseURL.host() }
+
     var body: some View {
         NavigationStack {
-            Form {
-                if let accounts, !accounts.isEmpty {
-                    accountsSection(accounts)
-                    Section {
-                        Picker("Bring in", selection: $history) {
-                            ForEach(History.allCases) { choice in
-                                Text(choice.rawValue).tag(choice)
+            ScrollView {
+                VStack(alignment: .leading, spacing: Theme.gap) {
+                    if let accounts, !accounts.isEmpty {
+                        accountsCard(accounts)
+                        historyCard
+                        agreementCard
+                    } else if hasAsked {
+                        Card {
+                            Text(accounts == nil
+                                ? (wallet.problem ?? "Wallet could not be read.")
+                                : "No Wallet accounts are shared with this app. Share them in the Settings app, then try again.")
+                                .font(Theme.body)
+                                .foregroundStyle(Theme.muted)
+                            Button("Try again") {
+                                Task { await ask() }
                             }
+                            .buttonStyle(PrimaryButtonStyle(fullWidth: true))
+                            .disabled(wallet.isWorking)
                         }
-                    } footer: {
-                        Text("Linking an account that already has these transactions in Sure? Choose only new activity, or they will show up twice.")
-                    }
-                    Section("By connecting, you agree that") {
-                        agreement("The accounts you chose, with their balances and transactions, are sent to your Sure server\(client.baseURL.host().map { " at \($0)" } ?? "").")
-                        agreement("Everyone in your Sure household can see them.")
-                        agreement("Sure works on them on the server, not on this phone.")
-                    }
-                    Section {
-                        if wallet.isWorking {
+                    } else {
+                        Card {
                             HStack(spacing: 10) {
                                 ProgressView()
-                                Text(wallet.activity ?? "Working")
+                                Text("Asking Wallet")
+                                    .font(Theme.body)
                                     .foregroundStyle(Theme.muted)
                             }
-                        } else {
-                            Button("Agree and connect") {
-                                Task { await connect(accounts) }
-                            }
-                            .font(Theme.bodyStrong)
-                            .disabled(selected.isEmpty)
-                        }
-                    } footer: {
-                        if let problem = wallet.problem, !wallet.isWorking {
-                            Text(problem).foregroundStyle(Theme.negative)
                         }
                     }
-                } else if hasAsked {
-                    Section {
-                        Text(accounts == nil
-                            ? (wallet.problem ?? "Wallet could not be read.")
-                            : "No Wallet accounts are shared with this app. Share them in the Settings app, then try again.")
-                            .foregroundStyle(Theme.muted)
-                        Button("Try again") {
-                            Task { await ask() }
-                        }
-                        .disabled(wallet.isWorking)
-                    }
-                } else {
-                    Section {
-                        HStack(spacing: 10) {
-                            ProgressView()
-                            Text("Asking Wallet")
-                                .foregroundStyle(Theme.muted)
-                        }
-                    }
+                }
+                .padding(.horizontal, Theme.margin)
+                .padding(.top, 8)
+                .padding(.bottom, 24)
+            }
+            .screenBackground()
+            .safeAreaInset(edge: .bottom) {
+                if let accounts, !accounts.isEmpty {
+                    connectBar(accounts)
                 }
             }
             .navigationTitle("Connect Apple Wallet")
@@ -359,41 +391,184 @@ struct WalletSetupView: View {
         }
     }
 
-    private func accountsSection(_ accounts: [WalletAccount]) -> some View {
-        Section {
-            ForEach(accounts) { account in
-                Toggle(isOn: isSelected(account.id)) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(account.title)
-                        Text(account.institutionName)
-                            .font(Theme.small)
-                            .foregroundStyle(Theme.muted)
+    // MARK: - Accounts
+
+    private func accountsCard(_ accounts: [WalletAccount]) -> some View {
+        Card(title: "Accounts") {
+            VStack(spacing: 0) {
+                ForEach(Array(accounts.enumerated()), id: \.element.id) { index, account in
+                    if index > 0 {
+                        RowRule().padding(.vertical, 14)
                     }
-                }
-                if selected.contains(account.id) {
-                    Picker("Goes into", selection: target(account.id)) {
-                        Text("A new \(WalletSetup.newAccountKind(for: account).label.lowercased()) account").tag("")
-                        ForEach(sureAccounts.filter { WalletSetup.canLink(account, to: $0) }) { existing in
-                            Text(existing.name).tag(existing.id)
-                        }
-                    }
+                    accountRow(account)
                 }
             }
-        } header: {
-            Text("Accounts")
-        } footer: {
-            Text("A Wallet account can go into a Sure account of the same kind and currency, or a new one.")
+            Text("An account can go into a Sure account of the same kind and currency, or a new one.")
+                .font(Theme.small)
+                .foregroundStyle(Theme.muted)
+        }
+    }
+
+    private func accountRow(_ account: WalletAccount) -> some View {
+        let kind = WalletSetup.newAccountKind(for: account).label
+        let isOn = selected.contains(account.id)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                WalletAccountIcon(isLiability: account.isLiability)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(account.title)
+                        .font(Theme.body)
+                        .foregroundStyle(Theme.text)
+                        .lineLimit(1)
+                    Text("\(kind) · \(account.institutionName)")
+                        .font(Theme.small)
+                        .foregroundStyle(Theme.muted)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                Toggle(account.title, isOn: isSelected(account.id))
+                    .labelsHidden()
+                    .tint(Theme.positive)
+            }
+            if isOn {
+                HStack(spacing: 8) {
+                    Text("Goes into")
+                        .font(Theme.small)
+                        .foregroundStyle(Theme.muted)
+                    Spacer(minLength: 0)
+                    Menu {
+                        Picker("Goes into", selection: target(account.id)) {
+                            Text("A new \(kind.lowercased()) account").tag("")
+                            ForEach(sureAccounts.filter { WalletSetup.canLink(account, to: $0) }) { existing in
+                                Text(existing.name).tag(existing.id)
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(targetName(account, kind: kind))
+                                .lineLimit(1)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        .font(Theme.smallStrong)
+                        .foregroundStyle(Theme.text)
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 32)
+                        .background(Theme.raised, in: .capsule)
+                    }
+                    .accessibilityLabel("Goes into \(targetName(account, kind: kind))")
+                }
+                // Lines up with the account's name, under its icon.
+                .padding(.leading, 52)
+            }
+        }
+        .animation(.snappy(duration: 0.2), value: isOn)
+    }
+
+    private func targetName(_ account: WalletAccount, kind: String) -> String {
+        if let id = targets[account.id], let existing = sureAccounts.first(where: { $0.id == id }) {
+            return existing.name
+        }
+        // The kind is already under the account's name.
+        return "New account"
+    }
+
+    // MARK: - History
+
+    private var historyCard: some View {
+        Card(title: "Bring in") {
+            VStack(spacing: 0) {
+                ForEach(Array(History.allCases.enumerated()), id: \.element) { index, choice in
+                    if index > 0 {
+                        RowRule()
+                    }
+                    Button {
+                        history = choice
+                    } label: {
+                        HStack(alignment: .top, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(choice.rawValue)
+                                    .font(Theme.body)
+                                    .foregroundStyle(Theme.text)
+                                Text(choice.detail)
+                                    .font(Theme.small)
+                                    .foregroundStyle(Theme.muted)
+                                    .multilineTextAlignment(.leading)
+                            }
+                            Spacer(minLength: 8)
+                            Image(systemName: history == choice ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 22))
+                                .foregroundStyle(history == choice ? Theme.text : Theme.control)
+                                .accessibilityHidden(true)
+                        }
+                        .padding(.vertical, 12)
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(history == choice ? .isSelected : [])
+                }
+            }
+            .padding(.vertical, -12)
+        }
+    }
+
+    // MARK: - Agreement and connect
+
+    private var agreementCard: some View {
+        Card(title: "By connecting, you agree that") {
+            VStack(alignment: .leading, spacing: 12) {
+                agreement("The accounts you chose, with their balances and transactions, are sent to your Sure server\(host.map { " at \($0)" } ?? "").")
+                agreement("Everyone in your Sure household can see them.")
+                agreement("Sure works on them on the server, not on this phone.")
+            }
         }
     }
 
     private func agreement(_ text: String) -> some View {
-        Label {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Circle()
+                .fill(Theme.muted)
+                .frame(width: 5, height: 5)
+                .alignmentGuide(.firstTextBaseline) { $0[.bottom] + 5 }
+                .accessibilityHidden(true)
             Text(text)
-        } icon: {
-            Image(systemName: "checkmark")
-                .foregroundStyle(Theme.muted)
+                .font(Theme.body)
+                .foregroundStyle(Theme.text)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
+
+    private func connectBar(_ accounts: [WalletAccount]) -> some View {
+        VStack(spacing: 10) {
+            if let problem = wallet.problem, !wallet.isWorking {
+                Text(problem)
+                    .font(Theme.small)
+                    .foregroundStyle(Theme.negative)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if wallet.isWorking {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text(wallet.activity ?? "Working")
+                        .font(Theme.body)
+                        .foregroundStyle(Theme.muted)
+                }
+                .frame(maxWidth: .infinity, minHeight: 52)
+            } else {
+                Button(selected.isEmpty ? "Choose an account" : "Agree and connect") {
+                    Task { await connect(accounts) }
+                }
+                .buttonStyle(PrimaryButtonStyle(fullWidth: true))
+                .disabled(selected.isEmpty)
+            }
+        }
+        .padding(.horizontal, Theme.margin)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+        .background(Theme.ground)
+    }
+
+    // MARK: - State
 
     private func isSelected(_ id: String) -> Binding<Bool> {
         Binding {
@@ -432,6 +607,7 @@ struct WalletSetupView: View {
         }
     }
 }
+
 
 /// The records Sure held back, and what to do about each.
 struct WalletReviewView: View {

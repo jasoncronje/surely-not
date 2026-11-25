@@ -52,6 +52,8 @@ What it needs:
 - **A current Sure server, reached over `https://`.** Wallet data is never sent over plain `http://`, not even on a local network.
 - **A sign-in with a second step**, by an administrator of the household: email, password and a two-factor code, or single sign-on. A password alone or an API key will not do. Apple's FinanceKit terms ask for both of these, so the app holds itself to them.
 
+To look at the Wallet screens in the Simulator, which has no Wallet data, run a Debug build with the launch argument `-WalletDemo setup` (the connect sheet) or `-WalletDemo connected` (a live connection). Both use a pretend Wallet and a pretend Sure, and are left out of Release builds.
+
 To turn it on once Apple has granted the entitlement, create `Config/Local.xcconfig` (git ignores it) with:
 
 ```
