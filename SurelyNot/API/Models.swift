@@ -113,6 +113,8 @@ nonisolated struct Holding: Decodable, Sendable, Identifiable {
     let qty: String?
     let price: String?
     let amount: String?
+    let currency: String?
+    let account: AccountRef?
     let security: Security?
 }
 

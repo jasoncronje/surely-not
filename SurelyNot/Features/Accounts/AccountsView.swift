@@ -46,11 +46,14 @@ struct AccountsSummary {
     let debts: String?
     /// Says so when Sure's totals leave out some of the balances listed.
     let note: String?
+    /// True when any account can hold stocks, funds or coins.
+    let hasInvestments: Bool
 
     /// `sheet` holds the totals Sure counts towards net worth, the same ones
     /// the Overview shows. Without it the totals are summed from the accounts.
     init(accounts: [Account], sheet: BalanceSheet?) {
         groups = AccountGroup.groups(from: accounts)
+        hasInvestments = accounts.contains(where: \.holdsSecurities)
         let listedAssets = Self.sum(accounts.filter { !$0.isLiability })
         let listedDebts = Self.sum(accounts.filter(\.isLiability))
         guard let sheet else {
@@ -139,6 +142,16 @@ struct AccountsView: View {
                                 .font(Theme.small)
                                 .foregroundStyle(Theme.muted)
                                 .padding(.horizontal, 4)
+                        }
+                        if summary.hasInvestments {
+                            NavigationLink {
+                                InvestmentsView(client: client)
+                            } label: {
+                                LinkRow(title: "All investments")
+                            }
+                            .buttonStyle(RowButtonStyle())
+                            .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
+                            .clipShape(.rect(cornerRadius: Theme.cardRadius))
                         }
                         ForEach(summary.groups) { group in
                             groupCard(group)

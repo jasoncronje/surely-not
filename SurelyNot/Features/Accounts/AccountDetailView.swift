@@ -51,7 +51,8 @@ final class AccountDetailModel {
     func loadHoldings() async {
         guard account.holdsSecurities else { return }
         holdings = await .fetching(keeping: holdings) {
-            let all = try await client.holdings(accountID: account.id)
+            let since = Calendar.current.date(byAdding: .day, value: -14, to: .now).map(Day.string)
+            let all = try await client.holdings(accountID: account.id, since: since)
             guard let latest = all.map(\.date).max() else { return [] }
             return all.filter { $0.date == latest }
         }

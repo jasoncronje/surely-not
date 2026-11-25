@@ -25,6 +25,38 @@ nonisolated enum MoneyFormat {
         string(decimal(cents: cents, currency: currency), currency: currency)
     }
 
+    /// Reads the number out of money the server has already formatted, such
+    /// as "$78,393.77", "-$1,304.18" or "1.234,56 €". Holdings come with no
+    /// plain number, so this is the only way to add them up.
+    static func value(ofFormatted text: String?) -> Decimal? {
+        guard let text else { return nil }
+        let kept = text.filter { $0.isNumber || $0 == "." || $0 == "," }
+        guard kept.contains(where: \.isNumber) else { return nil }
+        let dots = kept.count { $0 == "." }
+        let commas = kept.count { $0 == "," }
+        // The decimal mark is whichever separator comes last, unless the only
+        // separator present is clearly grouping thousands.
+        var decimalMark: Character?
+        if dots > 0, commas > 0 {
+            decimalMark = kept.last { $0 == "." || $0 == "," }
+        } else if dots == 1 {
+            decimalMark = "."
+        } else if commas == 1, let index = kept.firstIndex(of: ","), kept.distance(from: index, to: kept.endIndex) != 4 {
+            decimalMark = ","
+        }
+        var digits = ""
+        for character in kept {
+            if character == decimalMark {
+                digits.append(".")
+            } else if character.isNumber {
+                digits.append(character)
+            }
+        }
+        guard let value = Decimal(string: digits, locale: Locale(identifier: "en_US_POSIX")) else { return nil }
+        let isNegative = text.contains("-") || text.contains("−") || (text.contains("(") && text.contains(")"))
+        return isNegative ? -value : value
+    }
+
     static func double(_ amount: String?) -> Double {
         guard let amount, let value = Double(amount) else { return 0 }
         return value

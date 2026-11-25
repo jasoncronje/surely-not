@@ -488,6 +488,84 @@ private func decode<T: Decodable>(_ type: T.Type, _ json: String) throws -> T {
     }
 }
 
+@Suite struct PortfolioTests {
+    private func holding(
+        _ id: String,
+        date: String,
+        ticker: String,
+        amount: String,
+        account: String = "a1",
+        currency: String = "USD"
+    ) throws -> Holding {
+        try decode(Holding.self, """
+        {"id":"\(id)","date":"\(date)","qty":"10.5","price":"$10.00","amount":"\(amount)","currency":"\(currency)",
+         "account":{"id":"\(account)","name":"Pension","account_type":"investment"},
+         "security":{"id":"s-\(ticker)","ticker":"\(ticker)","name":null}}
+        """)
+    }
+
+    @Test func readsFormattedMoney() {
+        #expect(MoneyFormat.value(ofFormatted: "$78,393.77") == Decimal(string: "78393.77"))
+        #expect(MoneyFormat.value(ofFormatted: "-$1,304.18") == Decimal(string: "-1304.18"))
+        #expect(MoneyFormat.value(ofFormatted: "1.234,56 €") == Decimal(string: "1234.56"))
+        #expect(MoneyFormat.value(ofFormatted: "Ð27.24900000") == Decimal(string: "27.249"))
+        #expect(MoneyFormat.value(ofFormatted: "$1,000") == Decimal(1000))
+        #expect(MoneyFormat.value(ofFormatted: "12,50 €") == Decimal(string: "12.5"))
+        #expect(MoneyFormat.value(ofFormatted: "–") == nil)
+        #expect(MoneyFormat.value(ofFormatted: nil) == nil)
+    }
+
+    @Test func coinAmountsLoseTheirTrailingZeros() {
+        #expect(Portfolio.tidy("Ð27.24900000") == "Ð27.249")
+        #expect(Portfolio.tidy("Ð0.05560000") == "Ð0.0556")
+        #expect(Portfolio.tidy("$1,090.00") == "$1,090.00")
+        #expect(Portfolio.tidy("$1,000") == "$1,000")
+        #expect(Portfolio.tidy("–") == "–")
+    }
+
+    @Test func takesTheLatestDayAndSortsByValue() throws {
+        let portfolio = Portfolio(holdings: [
+            try holding("1", date: "2026-11-04", ticker: "AAA", amount: "$100.00"),
+            try holding("2", date: "2026-11-05", ticker: "AAA", amount: "$110.00"),
+            try holding("3", date: "2026-11-04", ticker: "BBB", amount: "$900.00"),
+            try holding("4", date: "2026-11-05", ticker: "BBB", amount: "$890.00"),
+        ])
+        #expect(portfolio.positions.map(\.symbol) == ["BBB", "AAA"])
+        #expect(portfolio.total == 1000)
+        #expect(portfolio.history.map(\.value) == [1000, 1000])
+        #expect(portfolio.share(of: portfolio.positions[0]) == 0.89)
+        #expect(portfolio.positions[1].history.count == 2)
+    }
+
+    @Test func aPositionWithNoRecentRowsIsGone() throws {
+        let portfolio = Portfolio(holdings: [
+            try holding("1", date: "2026-11-01", ticker: "OLD", amount: "$500.00"),
+            try holding("2", date: "2026-11-10", ticker: "NEW", amount: "$200.00"),
+        ])
+        #expect(portfolio.positions.map(\.symbol) == ["NEW"])
+    }
+
+    @Test func otherCurrenciesStayOutOfTheTotal() throws {
+        let portfolio = Portfolio(holdings: [
+            try holding("1", date: "2026-11-05", ticker: "AAA", amount: "$100.00"),
+            try holding("2", date: "2026-11-05", ticker: "BBB", amount: "$50.00"),
+            try holding("3", date: "2026-11-05", ticker: "CRYPTO:DOGE", amount: "Ð27.24900000", account: "a2", currency: "DOGE"),
+        ])
+        #expect(portfolio.currency == "USD")
+        #expect(portfolio.total == 150)
+        #expect(portfolio.others.map(\.symbol) == ["DOGE"])
+        #expect(portfolio.share(of: portfolio.others[0]) == nil)
+    }
+
+    @Test func theSameFundInTwoAccountsIsTwoPositions() throws {
+        let portfolio = Portfolio(holdings: [
+            try holding("1", date: "2026-11-05", ticker: "AAA", amount: "$100.00", account: "a1"),
+            try holding("2", date: "2026-11-05", ticker: "AAA", amount: "$300.00", account: "a2"),
+        ])
+        #expect(portfolio.positions.count == 2)
+    }
+}
+
 @Suite struct AppLockTests {
     @Test func aShortTripAwayDoesNotAskAgain() {
         #expect(!AppLock.needsUnlock(awayFor: 5))

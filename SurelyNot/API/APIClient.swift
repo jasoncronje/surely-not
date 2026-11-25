@@ -339,9 +339,27 @@ extension APIClient {
         return page.items
     }
 
-    func holdings(accountID: String) async throws -> [Holding] {
-        let page: Page<Holding> = try await get("holdings", query: ["account_id": accountID, "per_page": "100"])
-        return page.items
+    /// Daily holdings since a date, for one account or all of them.
+    ///
+    /// Sure lists the oldest day first, so the newest rows are on the last
+    /// page. This reads from the last page backwards and stops after
+    /// `maxPages`, which keeps today's holdings even in a long history.
+    func holdings(accountID: String? = nil, since startDate: String? = nil, maxPages: Int = 20) async throws -> [Holding] {
+        let query: [String: String?] = ["account_id": accountID, "start_date": startDate, "per_page": "100"]
+        func page(_ number: Int) async throws -> Page<Holding> {
+            var query = query
+            query["page"] = String(number)
+            return try await get("holdings", query: query)
+        }
+        let first = try await page(1)
+        let last = first.pagination?.totalPages ?? 1
+        guard last > 1 else { return first.items }
+        let oldest = max(last - maxPages + 1, 1)
+        var result = oldest == 1 ? first.items : []
+        for number in max(oldest, 2)...last {
+            result += try await page(number).items
+        }
+        return result
     }
 
     func chats() async throws -> [Chat] {

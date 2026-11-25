@@ -15,6 +15,7 @@ Four tabs, each backed by Sure's REST API (`/api/v1`):
 - **Transactions**: every transaction across your accounts, with search and filters for period, type, account and category. Add one with the plus button. Move one to another category by tapping its category, or by pressing and holding its row. Each one opens a detail screen with its notes, tags and links to everything else at that merchant, in that category or in that account.
 - **Chat**: Sure's AI assistant. Start, rename and delete chats, send messages, retry failed replies.
 - **Budgets**: each month's budget with spending per category. Tap a category to see that month's transactions in it.
+- **Investments**: every position across your investment accounts, each one's share of the total, and how the total and each position have moved over the last 90 days. Reached from Accounts.
 - **Lock**: an optional Face ID, Touch ID or passcode lock, switched on in Settings. It asks on opening and after a minute away, and hides the figures in the app switcher.
 - **Accounts**: accounts grouped by type, 90-day balance history, holdings, and transactions you can add, edit and delete.
 - **Apple Wallet**: sends Apple Card, Apple Cash and Savings from Wallet on your phone to Sure, with balances and transactions. Reached from Accounts. See [Apple Wallet](#apple-wallet) for what it needs.
