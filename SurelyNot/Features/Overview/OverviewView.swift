@@ -92,9 +92,9 @@ nonisolated enum SpendingFinding {
 
 struct OverviewView: View {
     private let client: APIClient
-    @Environment(Session.self) private var session
     @Environment(LedgerChanges.self) private var changes
     @State private var model: OverviewModel
+    @State private var showingSettings = false
 
     init(client: APIClient) {
         self.client = client
@@ -111,16 +111,6 @@ struct OverviewView: View {
                             NetWorthContent(sheet: sheet)
                         }
                     }
-                    // Accounts sit under the totals they add up to, as in
-                    // the sidebar of Sure on the web.
-                    NavigationLink {
-                        AccountsView(client: client)
-                    } label: {
-                        LinkRow(title: "Accounts")
-                    }
-                    .buttonStyle(RowButtonStyle())
-                    .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
-                    .clipShape(.rect(cornerRadius: Theme.cardRadius))
                     Card {
                         LoadableView(state: model.cashFlow, placeholderLines: 5, retry: model.loadCashFlow) { flow in
                             CashFlowContent(flow: flow)
@@ -145,6 +135,9 @@ struct OverviewView: View {
             }
             .screenBackground()
             .toolbar(.hidden, for: .navigationBar)
+            .sheet(isPresented: $showingSettings) {
+                SettingsView()
+            }
             .alert("That did not work", isPresented: actionErrorShown) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -205,20 +198,12 @@ struct OverviewView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                ProductMark(size: 22)
-                Text("Surely Not")
-                    .font(Theme.smallStrong)
-                    .foregroundStyle(Theme.text)
-                if let host = session.serverURL?.host() {
-                    Text(host)
-                        .font(Theme.small)
-                        .foregroundStyle(Theme.muted)
-                        .lineLimit(1)
+            ScreenHeader(title: "Home") {
+                Button("Settings", systemImage: "gearshape") {
+                    showingSettings = true
                 }
+                .buttonStyle(IconButtonStyle())
             }
-            .accessibilityElement(children: .combine)
-            ScreenHeader(title: "Home")
             if let spending = model.spending.value, let finding = SpendingFinding.sentence(for: spending) {
                 Text(finding)
                     .font(Theme.body)

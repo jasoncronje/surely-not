@@ -64,7 +64,7 @@ struct ChatListView: View {
                         Button("New chat", systemImage: "plus") {
                             path.append(.new)
                         }
-                        .buttonStyle(PrimaryButtonStyle())
+                        .buttonStyle(IconButtonStyle())
                     }
                     .padding(.top, 8)
                     LoadableView(state: model.chats, placeholderLines: 4, retry: model.load) { chats in

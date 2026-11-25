@@ -23,12 +23,9 @@ struct MoreView: View {
                         NavigationLink {
                             AccountsView(client: client)
                         } label: {
-                            MoreRow(title: "Accounts", detail: "Every account and its balance", systemImage: "building.columns")
-                        }
-                        NavigationLink {
-                            WalletView(client: client)
-                        } label: {
-                            MoreRow(title: "Apple Wallet", detail: "Apple Card and Apple Cash", systemImage: "wallet.pass")
+                            // Apple Wallet sync lives inside Accounts, by the
+                            // accounts it feeds, so it has no row of its own here.
+                            MoreRow(title: "Accounts", detail: "Balances and Apple Wallet sync", systemImage: "building.columns")
                         }
                         NavigationLink {
                             InvestmentsView(client: client)

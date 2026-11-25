@@ -104,6 +104,8 @@ struct TransactionsView: View {
     @State private var accounts: [Account] = []
     @State private var categories: [CategoryRef] = []
     @State private var isAdding = false
+    /// The filter chips stay tucked away until asked for.
+    @State private var showingFilters = false
 
     init(
         client: APIClient,
@@ -125,10 +127,14 @@ struct TransactionsView: View {
             LazyVStack(alignment: .leading, spacing: Theme.gap) {
                 if isRoot {
                     ScreenHeader(title: title) {
-                        Button("Add transaction", systemImage: "plus") {
-                            isAdding = true
+                        HStack(spacing: 8) {
+                            filterToggle
+                                .buttonStyle(IconButtonStyle())
+                            Button("Add transaction", systemImage: "plus") {
+                                isAdding = true
+                            }
+                            .buttonStyle(IconButtonStyle())
                         }
-                        .buttonStyle(IconButtonStyle())
                     }
                     .padding(.top, 8)
                 }
@@ -139,7 +145,10 @@ struct TransactionsView: View {
                     CategoryTrend(client: client, category: category)
                 }
                 SearchField(text: $filter.search)
-                filterBar
+                if showingFilters {
+                    filterBar
+                        .transition(.opacity)
+                }
                 status
                 TransactionDayList(transactions: model.transactions, showsAccount: filter.account == nil) { transaction in
                     TransactionDetailView(client: client, transaction: transaction)
@@ -159,6 +168,9 @@ struct TransactionsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(isRoot ? .hidden : .visible, for: .navigationBar)
         .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                filterToggle
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button("Add transaction", systemImage: "plus") {
                     isAdding = true
@@ -188,6 +200,26 @@ struct TransactionsView: View {
     }
 
     // MARK: - Filters
+
+    /// True when a chip narrows the list. Search has its own field, so it
+    /// does not count.
+    private var chipsNarrow: Bool {
+        filter.period != .allTime || filter.kind != .all || filter.account != nil
+            || filter.category != nil || filter.merchant != nil
+    }
+
+    /// Shows or hides the chips. Filled while a chip is narrowing the list,
+    /// so a hidden filter is never a surprise.
+    private var filterToggle: some View {
+        Button(
+            showingFilters ? "Hide filters" : "Show filters",
+            systemImage: chipsNarrow
+                ? "line.3.horizontal.decrease.circle.fill"
+                : "line.3.horizontal.decrease"
+        ) {
+            withAnimation(.snappy(duration: 0.2)) { showingFilters.toggle() }
+        }
+    }
 
     private var filterBar: some View {
         ScrollView(.horizontal) {

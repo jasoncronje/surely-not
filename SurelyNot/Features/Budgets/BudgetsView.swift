@@ -132,11 +132,14 @@ struct PlanView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.gap) {
-                    ScreenHeader(title: "Plan")
-                        .padding(.top, 8)
-                    LoadableView(state: model.budgets, retry: model.load) { budgets in
+                    ScreenHeader(title: "Plan") {
                         if let budget = model.selected {
                             monthSwitcher(budget)
+                        }
+                    }
+                    .padding(.top, 8)
+                    LoadableView(state: model.budgets, retry: model.load) { budgets in
+                        if let budget = model.selected {
                             LoadableView(state: model.detail, placeholderLines: 6, retry: model.loadDetail) { detail in
                                 BudgetContent(client: client, budget: budget, detail: detail)
                             }
@@ -170,17 +173,19 @@ struct PlanView: View {
         }
     }
 
+    /// Sits in the title row, at the trailing end, so the month reads as
+    /// part of the heading.
     private func monthSwitcher(_ budget: Budget) -> some View {
-        HStack {
+        HStack(spacing: 4) {
             Button("Earlier month", systemImage: "chevron.left") {
                 Task { await model.step(-1) }
             }
             .disabled(!model.canStep(-1))
-            Spacer()
             Text(budget.name)
-                .font(Theme.section)
+                .font(Theme.smallStrong)
                 .foregroundStyle(Theme.text)
-            Spacer()
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
             Button("Later month", systemImage: "chevron.right") {
                 Task { await model.step(1) }
             }
