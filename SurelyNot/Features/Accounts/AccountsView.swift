@@ -1,4 +1,5 @@
 import Observation
+import SafariServices
 import SwiftUI
 
 /// Accounts of one kind, such as all credit cards.
@@ -116,6 +117,7 @@ struct AccountsView: View {
     private let client: APIClient
     @Environment(LedgerChanges.self) private var changes
     @State private var model: AccountsModel
+    @State private var isAddingOnWeb = false
 
     init(client: APIClient) {
         self.client = client
@@ -130,7 +132,7 @@ struct AccountsView: View {
                     LoadableView(state: model.summary, placeholderLines: 6, retry: model.load) { summary in
                         if summary.groups.isEmpty {
                             Card {
-                                EmptyNote(text: "No accounts yet. Connect Apple Wallet, or add them in Sure on the web.")
+                                EmptyNote(text: "No accounts yet. Connect Apple Wallet, or add one below.")
                             }
                         }
                         if summary.assets != nil || summary.debts != nil {
@@ -164,6 +166,13 @@ struct AccountsView: View {
                             groupCard(group)
                         }
                     }
+                    Button {
+                        isAddingOnWeb = true
+                    } label: {
+                        AddAccountRow()
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 8)
                 }
                 .padding(.horizontal, Theme.margin)
                 .padding(.bottom, Theme.bottomRoom)
@@ -175,6 +184,14 @@ struct AccountsView: View {
                 AccountDetailView(client: client, account: account)
             }
             .refreshable { await model.load() }
+            // Sure's API cannot make accounts, so this opens Sure's own page
+            // for it. The list reloads when the page closes.
+            .sheet(isPresented: $isAddingOnWeb, onDismiss: {
+                Task { await model.load() }
+            }) {
+                SafariView(url: client.baseURL.appending(path: "accounts/new"))
+                    .ignoresSafeArea()
+            }
             .onAppear {
                 Task { await model.load() }
             }
@@ -292,4 +309,48 @@ private struct AccountRow: View {
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
     }
+}
+
+/// The way in to adding an account on Sure's website.
+struct AddAccountRow: View {
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "plus")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(Theme.muted)
+                .frame(width: 40, height: 40)
+                .background(Theme.raised, in: .circle)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Add an account")
+                    .font(Theme.body)
+                    .foregroundStyle(Theme.text)
+                Text("Opens Sure's website. Sign in there the first time.")
+                    .font(Theme.small)
+                    .foregroundStyle(Theme.muted)
+            }
+            Spacer(minLength: 8)
+            Image(systemName: "arrow.up.forward")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Theme.muted)
+        }
+        .padding(.horizontal, 16)
+        .frame(minHeight: 68)
+        .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
+        .contentShape(.rect)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Opens Sure's website")
+    }
+}
+
+/// A web page shown inside the app, with Safari's own controls.
+struct SafariView: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        SFSafariViewController(url: url)
+    }
+
+    func updateUIViewController(_ controller: SFSafariViewController, context: Context) {}
 }
