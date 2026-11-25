@@ -97,6 +97,9 @@ struct MainTabView: View {
             Tab("Chat", systemImage: "bubble.left.and.bubble.right") {
                 ChatListView(client: client)
             }
+            Tab("More", systemImage: "ellipsis.circle") {
+                MoreView(client: client, bills: bills)
+            }
         }
         // The tab bar shrinks out of the way while reading down a screen and
         // comes back on scrolling up.

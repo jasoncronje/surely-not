@@ -95,7 +95,6 @@ struct OverviewView: View {
     @Environment(Session.self) private var session
     @Environment(LedgerChanges.self) private var changes
     @State private var model: OverviewModel
-    @State private var showingSettings = false
 
     init(client: APIClient) {
         self.client = client
@@ -146,9 +145,6 @@ struct OverviewView: View {
             }
             .screenBackground()
             .toolbar(.hidden, for: .navigationBar)
-            .sheet(isPresented: $showingSettings) {
-                SettingsView()
-            }
             .alert("That did not work", isPresented: actionErrorShown) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -222,12 +218,7 @@ struct OverviewView: View {
                 }
             }
             .accessibilityElement(children: .combine)
-            ScreenHeader(title: "Home") {
-                Button("Settings", systemImage: "gearshape") {
-                    showingSettings = true
-                }
-                .buttonStyle(IconButtonStyle())
-            }
+            ScreenHeader(title: "Home")
             if let spending = model.spending.value, let finding = SpendingFinding.sentence(for: spending) {
                 Text(finding)
                     .font(Theme.body)
