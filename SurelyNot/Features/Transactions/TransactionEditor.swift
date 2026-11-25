@@ -25,8 +25,22 @@ nonisolated enum AmountParser {
 
 /// Adds a transaction to an account, or edits or deletes an existing one.
 struct TransactionEditor: View {
-    let model: AccountDetailModel
-    let existing: Transaction?
+    enum Target {
+        case new(accountID: String, currency: String)
+        case existing(Transaction)
+    }
+
+    enum Outcome {
+        case saved(Transaction)
+        case deleted
+    }
+
+    private let client: APIClient
+    private let target: Target
+    private let existing: Transaction?
+    /// Called once the server has accepted the change, before the sheet closes.
+    private let onDone: (Outcome) -> Void
+    @State private var categories: [CategoryRef] = []
 
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
@@ -39,8 +53,11 @@ struct TransactionEditor: View {
     @State private var errorMessage: String?
     @State private var confirmingDelete = false
 
-    init(model: AccountDetailModel, existing: Transaction?) {
-        self.model = model
+    init(client: APIClient, target: Target, onDone: @escaping (Outcome) -> Void) {
+        self.client = client
+        self.target = target
+        self.onDone = onDone
+        let existing: Transaction? = if case .existing(let transaction) = target { transaction } else { nil }
         self.existing = existing
         _name = State(initialValue: existing?.name ?? "")
         let amount = existing.flatMap { transaction in
@@ -57,6 +74,13 @@ struct TransactionEditor: View {
         AmountParser.parse(amountText)
     }
 
+    private var currency: String {
+        switch target {
+        case .new(_, let currency): currency
+        case .existing(let transaction): transaction.currency
+        }
+    }
+
     private var canSave: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty && amount != nil && !isWorking
     }
@@ -69,7 +93,7 @@ struct TransactionEditor: View {
                     HStack {
                         TextField("Amount", text: $amountText)
                             .keyboardType(.decimalPad)
-                        Text(existing?.currency ?? model.account.currency)
+                        Text(currency)
                             .foregroundStyle(.secondary)
                     }
                     Picker("Type", selection: $isIncome) {
@@ -83,7 +107,7 @@ struct TransactionEditor: View {
                 Section {
                     Picker("Category", selection: $categoryID) {
                         Text("None").tag(String?.none)
-                        ForEach(model.categories) { category in
+                        ForEach(categories) { category in
                             Text(category.name).tag(String?.some(category.id))
                         }
                     }
@@ -130,14 +154,28 @@ struct TransactionEditor: View {
                 Text("This cannot be undone.")
             }
             .interactiveDismissDisabled(isWorking)
+            .task { await loadCategories() }
         }
+    }
+
+    /// If this fails the picker just offers the category already set.
+    private func loadCategories() async {
+        var loaded = (try? await client.categories()) ?? []
+        if let current = existing?.category, !loaded.contains(where: { $0.id == current.id }) {
+            loaded.append(current)
+        }
+        categories = loaded.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     private func save() {
         guard let amount else { return }
         let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        var accountID: String?
+        if case .new(let id, _) = target {
+            accountID = id
+        }
         let input = TransactionInput(
-            accountId: existing == nil ? model.account.id : nil,
+            accountId: accountID,
             date: Day.string(date),
             amount: amount,
             name: name.trimmingCharacters(in: .whitespaces),
@@ -145,21 +183,29 @@ struct TransactionEditor: View {
             categoryId: categoryID,
             nature: isIncome ? "income" : "expense"
         )
-        run { try await model.save(input, replacing: existing) }
+        run {
+            if let existing {
+                return .saved(try await client.updateTransaction(id: existing.id, input))
+            }
+            return .saved(try await client.createTransaction(input))
+        }
     }
 
     private func delete() {
         guard let existing else { return }
-        run { try await model.delete(existing) }
+        run {
+            try await client.deleteTransaction(id: existing.id)
+            return .deleted
+        }
     }
 
-    private func run(_ action: @escaping () async throws -> Void) {
+    private func run(_ action: @escaping () async throws -> Outcome) {
         errorMessage = nil
         isWorking = true
         Task {
             defer { isWorking = false }
             do {
-                try await action()
+                onDone(try await action())
                 dismiss()
             } catch is CancellationError {
                 return

@@ -10,6 +10,8 @@ final class OverviewModel {
     var cashFlow: Loadable<CashFlow> = .loading
     var spending: Loadable<SpendingVsNormal> = .loading
     var insights: Loadable<[Insight]> = .loading
+    /// The newest few transactions across every account.
+    var recent: Loadable<[Transaction]> = .loading
     var actionError: String?
 
     init(client: APIClient) {
@@ -22,7 +24,8 @@ final class OverviewModel {
         async let flow: Void = loadCashFlow()
         async let spend: Void = loadSpending()
         async let tips: Void = loadInsights()
-        _ = await (sheet, flow, spend, tips)
+        async let latest: Void = loadRecent()
+        _ = await (sheet, flow, spend, tips, latest)
     }
 
     func loadBalanceSheet() async {
@@ -35,6 +38,12 @@ final class OverviewModel {
 
     func loadSpending() async {
         spending = await .fetching(keeping: spending) { try await client.spendingVsNormal() }
+    }
+
+    func loadRecent() async {
+        recent = await .fetching(keeping: recent) {
+            try await client.transactions(matching: TransactionFilter(), page: 1, perPage: 5).items
+        }
     }
 
     func loadInsights() async {
@@ -82,11 +91,14 @@ nonisolated enum SpendingFinding {
 }
 
 struct OverviewView: View {
+    private let client: APIClient
     @Environment(Session.self) private var session
+    @Environment(LedgerChanges.self) private var changes
     @State private var model: OverviewModel
     @State private var showingSettings = false
 
     init(client: APIClient) {
+        self.client = client
         _model = State(initialValue: OverviewModel(client: client))
     }
 
@@ -107,9 +119,10 @@ struct OverviewView: View {
                     }
                     Card(title: "Against your normal") {
                         LoadableView(state: model.spending, placeholderLines: 5, retry: model.loadSpending) { spending in
-                            SpendingContent(spending: spending)
+                            SpendingContent(client: client, spending: spending)
                         }
                     }
+                    recentTransactions
                     Card(title: "Insights") {
                         LoadableView(state: model.insights, retry: model.loadInsights) { insights in
                             InsightsContent(insights: insights) { insight in
@@ -133,7 +146,54 @@ struct OverviewView: View {
             }
             .refreshable { await model.load() }
             .task { await model.load() }
+            .onChange(of: changes.version) {
+                Task { await model.load() }
+            }
         }
+    }
+
+    /// The latest few transactions, and the way in to all of them.
+    private var recentTransactions: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Latest transactions")
+                    .font(Theme.section)
+                    .foregroundStyle(Theme.text)
+                Spacer()
+                NavigationLink("See all") {
+                    TransactionsView(client: client)
+                }
+                .font(Theme.smallStrong)
+                .foregroundStyle(Theme.text)
+                .frame(minHeight: 44)
+            }
+            .padding(.horizontal, 4)
+            switch model.recent {
+            case .loaded(let transactions) where !transactions.isEmpty:
+                VStack(spacing: 0) {
+                    ForEach(Array(transactions.enumerated()), id: \.element.id) { index, transaction in
+                        if index > 0 {
+                            RowRule().padding(.leading, 68)
+                        }
+                        NavigationLink {
+                            TransactionDetailView(client: client, transaction: transaction)
+                        } label: {
+                            TransactionRow(transaction: transaction, showsAccount: true)
+                        }
+                        .buttonStyle(RowButtonStyle())
+                    }
+                }
+                .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
+                .clipShape(.rect(cornerRadius: Theme.cardRadius))
+            default:
+                Card {
+                    LoadableView(state: model.recent, placeholderLines: 4, retry: model.loadRecent) { _ in
+                        EmptyNote(text: "No transactions yet.")
+                    }
+                }
+            }
+        }
+        .padding(.top, 8)
     }
 
     private var header: some View {
@@ -152,10 +212,18 @@ struct OverviewView: View {
             }
             .accessibilityElement(children: .combine)
             ScreenHeader(title: "Overview") {
-                Button("Settings", systemImage: "gearshape") {
-                    showingSettings = true
+                HStack(spacing: 8) {
+                    NavigationLink {
+                        TransactionsView(client: client)
+                    } label: {
+                        Label("Search transactions", systemImage: "magnifyingglass")
+                    }
+                    .buttonStyle(IconButtonStyle())
+                    Button("Settings", systemImage: "gearshape") {
+                        showingSettings = true
+                    }
+                    .buttonStyle(IconButtonStyle())
                 }
-                .buttonStyle(IconButtonStyle())
             }
             if let spending = model.spending.value, let finding = SpendingFinding.sentence(for: spending) {
                 Text(finding)
@@ -375,8 +443,58 @@ extension View {
 }
 
 private struct SpendingContent: View {
+    let client: APIClient
     let spending: SpendingVsNormal
     @State private var showingAll = false
+
+    /// The dates the figures cover, so a category opens on the same ones.
+    private var period: TransactionFilter.Period {
+        guard let range = spending.period else { return .thisMonth }
+        return .custom(start: range.startDate, end: range.endDate, label: "This month")
+    }
+
+    /// The transactions behind one category's figure.
+    private func destination(for category: SpendingVsNormal.Category, id: String) -> TransactionsView {
+        let total = MoneyFormat.double(category.total)
+        let normal = category.normal.map { MoneyFormat.double($0) }
+        var caption: String?
+        var captionColor = Theme.muted
+        if let normal, normal > 0 {
+            let difference = MoneyFormat.string(Decimal(abs(total - normal)), currency: spending.currency)
+            caption = total > normal ? "\(difference) above normal by now" : "\(difference) below normal by now"
+            captionColor = total > normal ? Theme.negative : Theme.muted
+        }
+        return TransactionsView(
+            client: client,
+            title: category.name,
+            filter: TransactionFilter(
+                period: period,
+                category: CategoryRef(id: id, name: category.name, color: category.color)
+            ),
+            summary: TransactionSummary(
+                name: category.name,
+                tint: Tint(hex: category.color),
+                label: "Net spent this month",
+                amount: MoneyFormat.string(category.total, currency: spending.currency),
+                caption: caption,
+                captionColor: captionColor,
+                value: total,
+                reference: normal
+            )
+        )
+    }
+
+    private func row(_ category: SpendingVsNormal.Category, linked: Bool) -> CategoryPaceRow {
+        CategoryPaceRow(
+            name: category.name,
+            tint: Tint(hex: category.color),
+            amount: MoneyFormat.string(category.total, currency: spending.currency),
+            caption: category.normal.map { "Normal by now \(MoneyFormat.string($0, currency: spending.currency))" },
+            value: MoneyFormat.double(category.total),
+            reference: category.normal.map { MoneyFormat.double($0) },
+            showsChevron: linked
+        )
+    }
 
     private var ranked: [SpendingVsNormal.Category] {
         spending.categories.sorted { MoneyFormat.double($0.total) > MoneyFormat.double($1.total) }
@@ -414,14 +532,16 @@ private struct SpendingContent: View {
                 }
             }
             ForEach(shown) { category in
-                CategoryPaceRow(
-                    name: category.name,
-                    tint: Tint(hex: category.color),
-                    amount: MoneyFormat.string(category.total, currency: spending.currency),
-                    caption: category.normal.map { "Normal by now \(MoneyFormat.string($0, currency: spending.currency))" },
-                    value: MoneyFormat.double(category.total),
-                    reference: category.normal.map { MoneyFormat.double($0) }
-                )
+                if let id = category.categoryId {
+                    NavigationLink {
+                        destination(for: category, id: id)
+                    } label: {
+                        row(category, linked: true)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    row(category, linked: false)
+                }
             }
             if ranked.count > 5 {
                 Button(showingAll ? "Show fewer" : "Show all \(ranked.count) categories") {
@@ -444,6 +564,8 @@ struct CategoryPaceRow: View {
     let value: Double
     let reference: Double?
     var scale: Double = 0
+    /// Marks the row as leading somewhere when it sits inside a link.
+    var showsChevron = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -459,6 +581,11 @@ struct CategoryPaceRow: View {
                         .font(Theme.bodyStrong)
                         .monospacedDigit()
                         .foregroundStyle(Theme.text)
+                    if showsChevron {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.muted)
+                    }
                 }
                 PaceBar(value: value, reference: reference, scale: scale)
                 if let caption {
@@ -468,6 +595,7 @@ struct CategoryPaceRow: View {
                 }
             }
         }
+        .contentShape(.rect)
         .accessibilityElement(children: .combine)
     }
 }

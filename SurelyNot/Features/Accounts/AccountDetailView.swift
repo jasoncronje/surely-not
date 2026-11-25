@@ -19,7 +19,6 @@ final class AccountDetailModel {
     var transactionsError: String?
     var isLoadingTransactions = false
     var hasMoreTransactions = false
-    var categories: [CategoryRef] = []
     private var nextPage = 1
 
     init(client: APIClient, account: Account) {
@@ -31,8 +30,7 @@ final class AccountDetailModel {
         async let historyLoad: Void = loadHistory()
         async let holdingsLoad: Void = loadHoldings()
         async let transactionsLoad: Void = reloadTransactions()
-        async let categoriesLoad: Void = loadCategories()
-        _ = await (historyLoad, holdingsLoad, transactionsLoad, categoriesLoad)
+        _ = await (historyLoad, holdingsLoad, transactionsLoad)
     }
 
     /// Daily balances for the last 90 days, oldest first.
@@ -73,7 +71,10 @@ final class AccountDetailModel {
         isLoadingTransactions = true
         defer { isLoadingTransactions = false }
         do {
-            let page = try await client.transactions(accountID: account.id, page: nextPage)
+            let filter = TransactionFilter(
+                account: AccountRef(id: account.id, name: account.name, accountType: account.accountType)
+            )
+            let page = try await client.transactions(matching: filter, page: nextPage)
             transactions = replacing ? page.items : transactions + page.items
             hasMoreTransactions = page.hasMore
             nextPage += 1
@@ -85,29 +86,8 @@ final class AccountDetailModel {
         }
     }
 
-    /// The category list only feeds the editor, so a failure here just means
-    /// the editor offers no categories.
-    private func loadCategories() async {
-        if let loaded = try? await client.categories() {
-            categories = loaded.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        }
-    }
-
-    func save(_ input: TransactionInput, replacing existing: Transaction?) async throws {
-        if let existing {
-            _ = try await client.updateTransaction(id: existing.id, input)
-        } else {
-            _ = try await client.createTransaction(input)
-        }
-        await refreshAfterChange()
-    }
-
-    func delete(_ transaction: Transaction) async throws {
-        try await client.deleteTransaction(id: transaction.id)
-        await refreshAfterChange()
-    }
-
-    private func refreshAfterChange() async {
+    /// A transaction changed somewhere, so the list and the balance line may have too.
+    func refreshAfterChange() async {
         async let transactionsLoad: Void = reloadTransactions()
         async let historyLoad: Void = loadHistory()
         _ = await (transactionsLoad, historyLoad)
@@ -115,44 +95,14 @@ final class AccountDetailModel {
 }
 
 struct AccountDetailView: View {
-    /// Which transaction the editor sheet is for.
-    private enum Editing: Identifiable {
-        case new
-        case existing(Transaction)
-
-        var id: String {
-            switch self {
-            case .new: "new"
-            case .existing(let transaction): transaction.id
-            }
-        }
-    }
-
-    /// A run of transactions that share a date.
-    private struct DayGroup: Identifiable {
-        let date: String
-        var transactions: [Transaction]
-        var id: String { date }
-    }
-
+    private let client: APIClient
+    @Environment(LedgerChanges.self) private var changes
     @State private var model: AccountDetailModel
-    @State private var editing: Editing?
+    @State private var isAdding = false
 
     init(client: APIClient, account: Account) {
+        self.client = client
         _model = State(initialValue: AccountDetailModel(client: client, account: account))
-    }
-
-    /// Transactions in the order received, split by date.
-    private var days: [DayGroup] {
-        var result: [DayGroup] = []
-        for transaction in model.transactions {
-            if let index = result.firstIndex(where: { $0.date == transaction.date }) {
-                result[index].transactions.append(transaction)
-            } else {
-                result.append(DayGroup(date: transaction.date, transactions: [transaction]))
-            }
-        }
-        return result
     }
 
     var body: some View {
@@ -191,7 +141,7 @@ struct AccountDetailView: View {
                         .foregroundStyle(Theme.text)
                     Spacer()
                     Button("Add", systemImage: "plus") {
-                        editing = .new
+                        isAdding = true
                     }
                     .buttonStyle(PrimaryButtonStyle())
                 }
@@ -215,28 +165,8 @@ struct AccountDetailView: View {
                     }
                 }
 
-                ForEach(days) { day in
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(Day.display(day.date))
-                            .font(Theme.small)
-                            .foregroundStyle(Theme.muted)
-                            .padding(.horizontal, 4)
-                        VStack(spacing: 0) {
-                            ForEach(Array(day.transactions.enumerated()), id: \.element.id) { index, transaction in
-                                if index > 0 {
-                                    RowRule().padding(.leading, 68)
-                                }
-                                Button {
-                                    editing = .existing(transaction)
-                                } label: {
-                                    TransactionRow(transaction: transaction)
-                                }
-                                .buttonStyle(RowButtonStyle())
-                            }
-                        }
-                        .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
-                        .clipShape(.rect(cornerRadius: Theme.cardRadius))
-                    }
+                TransactionDayList(transactions: model.transactions) { transaction in
+                    TransactionDetailView(client: client, transaction: transaction)
                 }
 
                 if model.hasMoreTransactions || model.isLoadingTransactions {
@@ -252,13 +182,16 @@ struct AccountDetailView: View {
         .screenBackground()
         .navigationTitle(model.account.name)
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(item: $editing) { editing in
-            switch editing {
-            case .new:
-                TransactionEditor(model: model, existing: nil)
-            case .existing(let transaction):
-                TransactionEditor(model: model, existing: transaction)
+        .sheet(isPresented: $isAdding) {
+            TransactionEditor(
+                client: client,
+                target: .new(accountID: model.account.id, currency: model.account.currency)
+            ) { _ in
+                changes.noteChange()
             }
+        }
+        .onChange(of: changes.version) {
+            Task { await model.refreshAfterChange() }
         }
         .refreshable { await model.load() }
         .task { await model.load() }
@@ -406,47 +339,6 @@ private struct HoldingRow: View {
                 .monospacedDigit()
                 .foregroundStyle(Theme.text)
         }
-        .accessibilityElement(children: .combine)
-    }
-}
-
-struct TransactionRow: View {
-    let transaction: Transaction
-
-    /// Sure writes money coming in as a negative amount ("-$442.13"). The row
-    /// shows it as "+$442.13" instead.
-    private var amountText: String {
-        let unsigned = transaction.amount.replacingOccurrences(of: "-", with: "")
-        return transaction.isIncome ? "+\(unsigned)" : unsigned
-    }
-
-    private var categoryName: String {
-        transaction.category?.name ?? "Uncategorised"
-    }
-
-    var body: some View {
-        HStack(spacing: 12) {
-            LetterTile(name: categoryName, tint: Tint(hex: transaction.category?.color))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(transaction.name)
-                    .font(Theme.body)
-                    .foregroundStyle(Theme.text)
-                    .lineLimit(1)
-                Text(categoryName)
-                    .font(Theme.small)
-                    .foregroundStyle(Theme.muted)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 8)
-            Text(amountText)
-                .font(Theme.bodyStrong)
-                .monospacedDigit()
-                .foregroundStyle(transaction.isIncome ? Theme.positive : Theme.text)
-                .layoutPriority(1)
-        }
-        .padding(.horizontal, 16)
-        .frame(minHeight: 68)
-        .contentShape(.rect)
         .accessibilityElement(children: .combine)
     }
 }

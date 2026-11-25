@@ -10,9 +10,10 @@ Early, version 0.1. It builds and its unit tests pass, but it has not been relea
 
 Four tabs, each backed by Sure's REST API (`/api/v1`):
 
-- **Overview**: net worth, this month's income and spending, spending compared with normal, and insights.
+- **Overview**: net worth, this month's income and spending, spending compared with normal, the latest transactions, and insights. Tap a category to see the transactions behind it.
+- **Transactions**: every transaction across your accounts, with search and filters for period, type, account and category. Each one opens a detail screen with its notes, tags and links to everything else at that merchant, in that category or in that account.
 - **Chat**: Sure's AI assistant. Start, rename and delete chats, send messages, retry failed replies.
-- **Budgets**: each month's budget with spending per category.
+- **Budgets**: each month's budget with spending per category. Tap a category to see that month's transactions in it.
 - **Accounts**: accounts grouped by type, 90-day balance history, holdings, and transactions you can add, edit and delete.
 
 Enter your server address, then sign in the way that server allows: single sign-on (Pocket ID, Google and so on), email and password (with a two-factor code if you use one), or an API key. Sign-in details are stored only in the iOS Keychain.

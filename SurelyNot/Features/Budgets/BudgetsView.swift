@@ -5,6 +5,8 @@ import SwiftUI
 struct BudgetDetail {
     struct Line: Identifiable {
         let id: String
+        /// The category itself, as opposed to `id`, which is its line in this budget.
+        let categoryID: String
         let name: String
         let color: String?
         let budgeted: Decimal
@@ -97,6 +99,7 @@ final class BudgetsModel {
             .map { item in
                 BudgetDetail.Line(
                     id: item.id,
+                    categoryID: item.category.id,
                     name: item.category.name,
                     color: item.category.color,
                     budgeted: MoneyFormat.decimal(cents: item.budgetedSpendingCents ?? 0, currency: item.currency ?? ""),
@@ -113,9 +116,12 @@ final class BudgetsModel {
 }
 
 struct BudgetsView: View {
+    private let client: APIClient
+    @Environment(LedgerChanges.self) private var changes
     @State private var model: BudgetsModel
 
     init(client: APIClient) {
+        self.client = client
         _model = State(initialValue: BudgetsModel(client: client))
     }
 
@@ -129,7 +135,7 @@ struct BudgetsView: View {
                         if let budget = model.selected {
                             monthSwitcher(budget)
                             LoadableView(state: model.detail, placeholderLines: 6, retry: model.loadDetail) { detail in
-                                BudgetContent(budget: budget, detail: detail)
+                                BudgetContent(client: client, budget: budget, detail: detail)
                             }
                         } else if budgets.isEmpty {
                             Card {
@@ -145,6 +151,9 @@ struct BudgetsView: View {
             .toolbar(.hidden, for: .navigationBar)
             .refreshable { await model.load() }
             .task { await model.load() }
+            .onChange(of: changes.version) {
+                Task { await model.loadDetail() }
+            }
         }
     }
 
@@ -169,6 +178,7 @@ struct BudgetsView: View {
 }
 
 private struct BudgetContent: View {
+    let client: APIClient
     let budget: Budget
     let detail: BudgetDetail
 
@@ -187,6 +197,44 @@ private struct BudgetContent: View {
         let amount = MoneyFormat.string(abs(left), currency: budget.currency)
         return left >= 0 ? ("\(amount) left of \(MoneyFormat.string(totalBudgeted, currency: budget.currency))", Theme.muted)
             : ("\(amount) over the \(MoneyFormat.string(totalBudgeted, currency: budget.currency)) budget", Theme.negative)
+    }
+
+    /// The budget's own dates, so a category opens on exactly this month.
+    private var period: TransactionFilter.Period {
+        .custom(start: budget.startDate, end: budget.endDate, label: budget.name)
+    }
+
+    /// The transactions behind one category's line.
+    private func destination(for line: BudgetDetail.Line) -> TransactionsView {
+        var caption: String?
+        var captionColor = Theme.muted
+        if line.budgeted > 0, let spent = line.spent {
+            let left = line.budgeted - spent
+            let amount = MoneyFormat.string(abs(left), currency: budget.currency)
+            let whole = MoneyFormat.string(line.budgeted, currency: budget.currency)
+            caption = left >= 0 ? "\(amount) left of \(whole)" : "\(amount) over the \(whole) budget"
+            captionColor = left >= 0 ? Theme.muted : Theme.negative
+        } else if line.budgeted == 0 {
+            caption = "No budget set for this category."
+        }
+        return TransactionsView(
+            client: client,
+            title: line.name,
+            filter: TransactionFilter(
+                period: period,
+                category: CategoryRef(id: line.categoryID, name: line.name, color: line.color)
+            ),
+            summary: TransactionSummary(
+                name: line.name,
+                tint: Tint(hex: line.color),
+                label: "Net spent in \(budget.name)",
+                amount: line.spent.map { MoneyFormat.string($0, currency: budget.currency) } ?? "–",
+                caption: caption,
+                captionColor: captionColor,
+                value: double(line.spent ?? 0),
+                reference: line.budgeted > 0 ? double(line.budgeted) : nil
+            )
+        )
     }
 
     /// The largest category, so unbudgeted bars can be compared with each other.
@@ -230,6 +278,12 @@ private struct BudgetContent: View {
                         .font(Theme.small)
                         .foregroundStyle(Theme.muted)
                 }
+                NavigationLink("See every transaction in \(budget.name)") {
+                    TransactionsView(client: client, title: budget.name, filter: TransactionFilter(period: period))
+                }
+                .font(Theme.smallStrong)
+                .foregroundStyle(Theme.text)
+                .frame(minHeight: 44)
             }
             Card(title: "By category") {
                 if detail.lines.isEmpty {
@@ -237,6 +291,9 @@ private struct BudgetContent: View {
                 }
                 VStack(spacing: 18) {
                     ForEach(detail.lines) { line in
+                        NavigationLink {
+                            destination(for: line)
+                        } label: {
                         CategoryPaceRow(
                             name: line.name,
                             tint: Tint(hex: line.color),
@@ -246,8 +303,11 @@ private struct BudgetContent: View {
                                 : nil,
                             value: double(line.spent ?? 0),
                             reference: line.budgeted > 0 ? double(line.budgeted) : nil,
-                            scale: largestSpend
+                            scale: largestSpend,
+                            showsChevron: true
                         )
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }

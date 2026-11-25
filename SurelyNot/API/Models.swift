@@ -129,6 +129,12 @@ nonisolated struct MerchantRef: Decodable, Sendable, Hashable {
     let name: String
 }
 
+nonisolated struct TagRef: Decodable, Sendable, Hashable, Identifiable {
+    let id: String
+    let name: String
+    let color: String?
+}
+
 nonisolated struct Transaction: Decodable, Sendable, Identifiable, Hashable {
     let id: String
     let date: String
@@ -142,8 +148,32 @@ nonisolated struct Transaction: Decodable, Sendable, Identifiable, Hashable {
     let account: AccountRef?
     let category: CategoryRef?
     let merchant: MerchantRef?
+    /// How Sure's budgets and reports treat it, such as `standard` or `cc_payment`.
+    let kind: String?
+    /// True when it is left out of budgets and reports.
+    let excluded: Bool?
+    let tags: [TagRef]?
 
     var isIncome: Bool { classification == "income" }
+
+    /// The amount as a person reads it. Sure writes money coming in as a
+    /// negative amount ("-$442.13"); this gives "+$442.13" instead.
+    var displayAmount: String {
+        let unsigned = amount.replacingOccurrences(of: "-", with: "")
+        return isIncome ? "+\(unsigned)" : unsigned
+    }
+
+    /// A plain name for the kinds that are not ordinary spending or income.
+    var kindLabel: String? {
+        switch kind {
+        case "funds_movement": "Transfer between accounts"
+        case "cc_payment": "Credit card payment"
+        case "loan_payment": "Loan payment"
+        case "one_time": "One-time"
+        case "investment_contribution": "Investment contribution"
+        default: nil
+        }
+    }
 }
 
 /// Body for creating or updating a transaction. Nil fields are left out.

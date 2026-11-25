@@ -290,8 +290,11 @@ extension APIClient {
         return page.items
     }
 
-    func transactions(accountID: String, page: Int) async throws -> Page<Transaction> {
-        try await get("transactions", query: ["account_id": accountID, "page": String(page), "per_page": "30"])
+    func transactions(matching filter: TransactionFilter, page: Int, perPage: Int = 30) async throws -> Page<Transaction> {
+        var query = filter.query()
+        query["page"] = String(page)
+        query["per_page"] = String(perPage)
+        return try await get("transactions", query: query)
     }
 
     func createTransaction(_ input: TransactionInput) async throws -> Transaction {

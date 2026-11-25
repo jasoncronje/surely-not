@@ -29,6 +29,7 @@ struct SurelyNotApp: App {
 
 struct MainTabView: View {
     let client: APIClient
+    @State private var changes = LedgerChanges()
 
     var body: some View {
         TabView {
@@ -48,6 +49,7 @@ struct MainTabView: View {
         // The tab bar shrinks out of the way while reading down a screen and
         // comes back on scrolling up.
         .tabBarMinimizeBehavior(.onScrollDown)
+        .environment(changes)
     }
 }
 

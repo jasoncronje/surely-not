@@ -114,6 +114,7 @@ struct MoneyText: View {
     let amount: String
     var font: Font = Theme.figure
     var centsFont: Font = Theme.font(20, .semibold, relativeTo: .title3)
+    var color: Color = Theme.text
 
     /// Splits "$14,824.57" into "$14,824" and ".57". Amounts without two
     /// trailing decimals come back whole.
@@ -130,7 +131,7 @@ struct MoneyText: View {
 
     var body: some View {
         let parts = Self.split(amount)
-        Text("\(Text(parts.whole).font(font).foregroundStyle(Theme.text))\(Text(parts.cents).font(centsFont).foregroundStyle(Theme.muted))")
+        Text("\(Text(parts.whole).font(font).foregroundStyle(color))\(Text(parts.cents).font(centsFont).foregroundStyle(Theme.muted))")
             .tracking(-0.5)
             .lineLimit(1)
             .minimumScaleFactor(0.6)

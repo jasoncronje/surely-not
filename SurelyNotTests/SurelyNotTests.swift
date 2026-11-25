@@ -417,3 +417,73 @@ private func decode<T: Decodable>(_ type: T.Type, _ json: String) throws -> T {
         #expect(body.mfaRequired == true)
     }
 }
+
+@Suite struct TransactionFilterTests {
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        return calendar
+    }
+
+    private func day(_ text: String) throws -> Date {
+        try #require(Day.date(text))
+    }
+
+    @Test func anEmptyFilterAsksForEverything() {
+        let query = TransactionFilter().query().compactMapValues { $0 }
+        #expect(query.isEmpty)
+        #expect(TransactionFilter().isEmpty)
+    }
+
+    @Test func eachPartBecomesItsOwnQueryValue() {
+        var filter = TransactionFilter()
+        filter.search = "  coffee "
+        filter.kind = .expense
+        filter.account = AccountRef(id: "a1", name: "Checking", accountType: nil)
+        filter.category = CategoryRef(id: "c1", name: "Food", color: nil)
+        filter.merchant = MerchantRef(id: "m1", name: "Cafe")
+        filter.period = .custom(start: "2026-10-01", end: "2026-10-31", label: "October 2026")
+        let query = filter.query().compactMapValues { $0 }
+        #expect(query == [
+            "search": "coffee",
+            "type": "expense",
+            "account_id": "a1",
+            "category_id": "c1",
+            "merchant_id": "m1",
+            "start_date": "2026-10-01",
+            "end_date": "2026-10-31",
+        ])
+        #expect(!filter.isEmpty)
+    }
+
+    @Test func thisMonthRunsFromTheFirstToTheLastDay() throws {
+        let dates = TransactionFilter.Period.thisMonth.dates(now: try day("2026-02-14"), calendar: calendar)
+        #expect(dates?.start == "2026-02-01")
+        #expect(dates?.end == "2026-02-28")
+    }
+
+    @Test func lastMonthCrossesTheYear() throws {
+        let dates = TransactionFilter.Period.lastMonth.dates(now: try day("2026-01-09"), calendar: calendar)
+        #expect(dates?.start == "2025-12-01")
+        #expect(dates?.end == "2025-12-31")
+    }
+
+    @Test func allTimeHasNoDates() {
+        #expect(TransactionFilter.Period.allTime.dates() == nil)
+    }
+
+    @Test func moneyInReadsAsAPlus() throws {
+        let json = #"{"id":"t1","date":"2026-11-19","amount":"-$899.00","currency":"USD","name":"Pay","classification":"income","kind":"loan_payment","excluded":false,"tags":[{"id":"g1","name":"Work","color":null}]}"#
+        let transaction = try APIClient.decoder.decode(Transaction.self, from: Data(json.utf8))
+        #expect(transaction.displayAmount == "+$899.00")
+        #expect(transaction.kindLabel == "Loan payment")
+        #expect(transaction.tags?.first?.name == "Work")
+    }
+
+    @Test func ordinarySpendingHasNoSpecialKind() throws {
+        let json = #"{"id":"t2","date":"2026-11-19","amount":"$8.20","currency":"USD","name":"Coffee","classification":"expense","kind":"standard"}"#
+        let transaction = try APIClient.decoder.decode(Transaction.self, from: Data(json.utf8))
+        #expect(transaction.displayAmount == "$8.20")
+        #expect(transaction.kindLabel == nil)
+    }
+}
