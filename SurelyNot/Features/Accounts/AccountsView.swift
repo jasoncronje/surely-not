@@ -123,11 +123,10 @@ struct AccountsView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        // Opened from Home, so it lives in Home's navigation stack.
+        Group {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.gap) {
-                    ScreenHeader(title: "Accounts")
-                        .padding(.top, 8)
                     LoadableView(state: model.summary, placeholderLines: 6, retry: model.load) { summary in
                         if summary.groups.isEmpty {
                             Card {
@@ -170,7 +169,8 @@ struct AccountsView: View {
                 .padding(.bottom, Theme.bottomRoom)
             }
             .screenBackground()
-            .toolbar(.hidden, for: .navigationBar)
+            .navigationTitle("Accounts")
+            .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: Account.self) { account in
                 AccountDetailView(client: client, account: account)
             }

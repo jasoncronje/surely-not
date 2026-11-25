@@ -13,12 +13,9 @@ final class OverviewModel {
     /// The newest few transactions across every account.
     var recent: Loadable<[Transaction]> = .loading
     var actionError: String?
-    /// This month's bills. Shared with the Bills screen so both stay in step.
-    let bills: BillsModel
 
     init(client: APIClient) {
         self.client = client
-        bills = BillsModel(client: client)
     }
 
     /// Each block loads on its own, so one failing does not blank the screen.
@@ -28,8 +25,7 @@ final class OverviewModel {
         async let spend: Void = loadSpending()
         async let tips: Void = loadInsights()
         async let latest: Void = loadRecent()
-        async let due: Void = bills.load()
-        _ = await (sheet, flow, spend, tips, latest, due)
+        _ = await (sheet, flow, spend, tips, latest)
     }
 
     func loadBalanceSheet() async {
@@ -116,6 +112,16 @@ struct OverviewView: View {
                             NetWorthContent(sheet: sheet)
                         }
                     }
+                    // Accounts sit under the totals they add up to, as in
+                    // the sidebar of Sure on the web.
+                    NavigationLink {
+                        AccountsView(client: client)
+                    } label: {
+                        LinkRow(title: "Accounts")
+                    }
+                    .buttonStyle(RowButtonStyle())
+                    .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
+                    .clipShape(.rect(cornerRadius: Theme.cardRadius))
                     Card {
                         LoadableView(state: model.cashFlow, placeholderLines: 5, retry: model.loadCashFlow) { flow in
                             CashFlowContent(flow: flow)
@@ -126,7 +132,6 @@ struct OverviewView: View {
                             SpendingContent(client: client, spending: spending)
                         }
                     }
-                    BillsBlock(client: client, model: model.bills)
                     recentTransactions
                     Card(title: "Insights") {
                         LoadableView(state: model.insights, retry: model.loadInsights) { insights in
@@ -217,7 +222,7 @@ struct OverviewView: View {
                 }
             }
             .accessibilityElement(children: .combine)
-            ScreenHeader(title: "Overview") {
+            ScreenHeader(title: "Home") {
                 Button("Settings", systemImage: "gearshape") {
                     showingSettings = true
                 }

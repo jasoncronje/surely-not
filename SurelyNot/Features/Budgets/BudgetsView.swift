@@ -115,13 +115,16 @@ final class BudgetsModel {
     }
 }
 
-struct BudgetsView: View {
+/// The Plan tab: this month's budget, then the bills still to pay.
+struct PlanView: View {
     private let client: APIClient
+    private let bills: BillsModel
     @Environment(LedgerChanges.self) private var changes
     @State private var model: BudgetsModel
 
-    init(client: APIClient) {
+    init(client: APIClient, bills: BillsModel) {
         self.client = client
+        self.bills = bills
         _model = State(initialValue: BudgetsModel(client: client))
     }
 
@@ -129,7 +132,7 @@ struct BudgetsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.gap) {
-                    ScreenHeader(title: "Budgets")
+                    ScreenHeader(title: "Plan")
                         .padding(.top, 8)
                     LoadableView(state: model.budgets, retry: model.load) { budgets in
                         if let budget = model.selected {
@@ -143,16 +146,26 @@ struct BudgetsView: View {
                             }
                         }
                     }
+                    BillsBlock(client: client, model: bills)
+                        .padding(.top, 8)
                 }
                 .padding(.horizontal, Theme.margin)
                 .padding(.bottom, Theme.bottomRoom)
             }
             .screenBackground()
             .toolbar(.hidden, for: .navigationBar)
-            .refreshable { await model.load() }
+            .refreshable {
+                async let budgets: Void = model.load()
+                async let due: Void = bills.load()
+                _ = await (budgets, due)
+            }
             .task { await model.load() }
             .onChange(of: changes.version) {
-                Task { await model.loadDetail() }
+                Task {
+                    async let detail: Void = model.loadDetail()
+                    async let due: Void = bills.load()
+                    _ = await (detail, due)
+                }
             }
         }
     }

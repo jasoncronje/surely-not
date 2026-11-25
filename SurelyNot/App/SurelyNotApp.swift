@@ -62,6 +62,9 @@ struct MainTabView: View {
     @State private var changes: LedgerChanges
     @State private var categoryChanger: CategoryChanger
     @State private var wallet: WalletSync
+    /// This month's bills. Loaded here, not only on Plan, because each load
+    /// also refreshes the bill reminders and the widget.
+    @State private var bills: BillsModel
     @Environment(\.scenePhase) private var scenePhase
 
     init(client: APIClient, signIn: SignInMethod?) {
@@ -73,23 +76,23 @@ struct MainTabView: View {
         // New Wallet data changes balances and lists across the app.
         wallet.onImported = { changes.noteChange() }
         _wallet = State(initialValue: wallet)
+        _bills = State(initialValue: BillsModel(client: client))
     }
 
     var body: some View {
         TabView {
-            Tab("Overview", systemImage: "chart.pie") {
+            // Matches Sure on the web: Home holds the money you have (accounts
+            // live there), Plan holds what is coming (budgets and bills).
+            Tab("Home", systemImage: "chart.pie") {
                 OverviewView(client: client)
             }
-            Tab("Transactions", systemImage: "list.bullet") {
+            Tab("Activity", systemImage: "list.bullet") {
                 NavigationStack {
-                    TransactionsView(client: client, isRoot: true)
+                    TransactionsView(client: client, title: "Activity", isRoot: true)
                 }
             }
-            Tab("Budgets", systemImage: "target") {
-                BudgetsView(client: client)
-            }
-            Tab("Accounts", systemImage: "building.columns") {
-                AccountsView(client: client)
+            Tab("Plan", systemImage: "safari") {
+                PlanView(client: client, bills: bills)
             }
             Tab("Chat", systemImage: "bubble.left.and.bubble.right") {
                 ChatListView(client: client)
@@ -105,6 +108,7 @@ struct MainTabView: View {
         // Wallet can only be read while the app is open, so each time the
         // app comes to the front it sends what is new.
         .task { await wallet.syncIfDue() }
+        .task { await bills.load() }
         .onChange(of: scenePhase) {
             if scenePhase == .active {
                 Task { await wallet.syncIfDue() }
