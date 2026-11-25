@@ -36,14 +36,19 @@ struct MainTabView: View {
             Tab("Overview", systemImage: "chart.pie") {
                 OverviewView(client: client)
             }
-            Tab("Chat", systemImage: "bubble.left.and.bubble.right") {
-                ChatListView(client: client)
+            Tab("Transactions", systemImage: "list.bullet") {
+                NavigationStack {
+                    TransactionsView(client: client, isRoot: true)
+                }
             }
             Tab("Budgets", systemImage: "target") {
                 BudgetsView(client: client)
             }
             Tab("Accounts", systemImage: "building.columns") {
                 AccountsView(client: client)
+            }
+            Tab("Chat", systemImage: "bubble.left.and.bubble.right") {
+                ChatListView(client: client)
             }
         }
         // The tab bar shrinks out of the way while reading down a screen and

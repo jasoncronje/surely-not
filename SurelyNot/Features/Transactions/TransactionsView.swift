@@ -95,6 +95,9 @@ struct TransactionsView: View {
     private let client: APIClient
     private let title: String
     private let summary: TransactionSummary?
+    /// True when this is a tab's first screen, which draws its own large
+    /// title like the other tabs instead of using the navigation bar.
+    private let isRoot: Bool
     @Environment(LedgerChanges.self) private var changes
     @State private var model: TransactionListModel
     @State private var filter: TransactionFilter
@@ -105,11 +108,13 @@ struct TransactionsView: View {
         client: APIClient,
         title: String = "Transactions",
         filter: TransactionFilter = TransactionFilter(),
-        summary: TransactionSummary? = nil
+        summary: TransactionSummary? = nil,
+        isRoot: Bool = false
     ) {
         self.client = client
         self.title = title
         self.summary = summary
+        self.isRoot = isRoot
         _filter = State(initialValue: filter)
         _model = State(initialValue: TransactionListModel(client: client, filter: filter))
     }
@@ -117,9 +122,14 @@ struct TransactionsView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: Theme.gap) {
+                if isRoot {
+                    ScreenHeader(title: title)
+                        .padding(.top, 8)
+                }
                 if let summary {
                     SummaryCard(summary: summary)
                 }
+                SearchField(text: $filter.search)
                 filterBar
                 status
                 TransactionDayList(transactions: model.transactions, showsAccount: filter.account == nil) { transaction in
@@ -138,12 +148,8 @@ struct TransactionsView: View {
         .screenBackground()
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(
-            text: $filter.search,
-            placement: .navigationBarDrawer(displayMode: .always),
-            prompt: "Name, merchant or note"
-        )
-        .autocorrectionDisabled()
+        .toolbar(isRoot ? .hidden : .visible, for: .navigationBar)
+        .scrollDismissesKeyboard(.immediately)
         .refreshable { await model.reload() }
         .task(id: filter) {
             // Typing waits for a pause; taps on a filter apply at once.
@@ -289,6 +295,41 @@ struct TransactionsView: View {
                 .padding(.horizontal, 4)
                 .opacity(model.isLoading ? 0.5 : 1)
         }
+    }
+}
+
+/// The search box at the top of the list.
+private struct SearchField: View {
+    @Binding var text: String
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(Theme.muted)
+            TextField("Search name, merchant or note", text: $text)
+                .font(Theme.body)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+                .focused($isFocused)
+                .accessibilityIdentifier("transactionSearch")
+            if !text.isEmpty {
+                Button("Clear search", systemImage: "xmark.circle.fill") {
+                    text = ""
+                }
+                .labelStyle(.iconOnly)
+                .foregroundStyle(Theme.muted)
+                .frame(width: 44, height: 44)
+            }
+        }
+        .padding(.leading, 16)
+        .padding(.trailing, text.isEmpty ? 16 : 2)
+        .frame(minHeight: 48)
+        .background(Theme.surface, in: .rect(cornerRadius: Theme.controlRadius))
+        .contentShape(.rect)
+        .onTapGesture { isFocused = true }
     }
 }
 

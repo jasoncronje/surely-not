@@ -212,18 +212,10 @@ struct OverviewView: View {
             }
             .accessibilityElement(children: .combine)
             ScreenHeader(title: "Overview") {
-                HStack(spacing: 8) {
-                    NavigationLink {
-                        TransactionsView(client: client)
-                    } label: {
-                        Label("Search transactions", systemImage: "magnifyingglass")
-                    }
-                    .buttonStyle(IconButtonStyle())
-                    Button("Settings", systemImage: "gearshape") {
-                        showingSettings = true
-                    }
-                    .buttonStyle(IconButtonStyle())
+                Button("Settings", systemImage: "gearshape") {
+                    showingSettings = true
                 }
+                .buttonStyle(IconButtonStyle())
             }
             if let spending = model.spending.value, let finding = SpendingFinding.sentence(for: spending) {
                 Text(finding)
