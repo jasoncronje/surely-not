@@ -135,6 +135,9 @@ struct TransactionsView: View {
                 if let summary {
                     SummaryCard(summary: summary)
                 }
+                if let category = filter.category {
+                    CategoryTrend(client: client, category: category)
+                }
                 SearchField(text: $filter.search)
                 filterBar
                 status

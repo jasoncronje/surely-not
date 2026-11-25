@@ -41,6 +41,7 @@
 		991CFE4CC1A1F7FCA461CCA8 /* WalletWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49B5F7DFEECB0E9D879D3FA0 /* WalletWire.swift */; };
 		9D05F7DC5C3FA8EA0E2F41BC /* TransactionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 354C40158B81E9E7132175C8 /* TransactionDetailView.swift */; };
 		AE10D230FD2101AD28F6C098 /* SurelyNotApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64B618A1EA8F36504E4AA12B /* SurelyNotApp.swift */; };
+		B94C5D44CF5942F53F2FC038 /* CategoryTrend.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6E73586F0DE196997779792 /* CategoryTrend.swift */; };
 		C2840769FFA800E764021AF9 /* OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 5D40DFD885781AD7BD42C06A /* OFL.txt */; };
 		D33C8CFD46EDA3E486054792 /* MarkdownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E13AC36A71B55988EE71E12 /* MarkdownView.swift */; };
 		DCD06C8B9E346EA35F131828 /* BillsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A97C186A4880D962252D426 /* BillsView.swift */; };
@@ -120,6 +121,7 @@
 		908802C8497D49ABD5D968A7 /* AppLock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLock.swift; sourceTree = "<group>"; };
 		9E13AC36A71B55988EE71E12 /* MarkdownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownView.swift; sourceTree = "<group>"; };
 		A5EEC08EE2D2693F9F237EEC /* ChatListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatListView.swift; sourceTree = "<group>"; };
+		A6E73586F0DE196997779792 /* CategoryTrend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryTrend.swift; sourceTree = "<group>"; };
 		AC584E56DBBB28E780122466 /* TransactionEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionEditor.swift; sourceTree = "<group>"; };
 		B0DAC87A7FB4F4806427376C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B185A0D881B6E5609162D06E /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
@@ -264,6 +266,7 @@
 			isa = PBXGroup;
 			children = (
 				D9293F1B6360A257BE14C41E /* CategoryChanger.swift */,
+				A6E73586F0DE196997779792 /* CategoryTrend.swift */,
 				354C40158B81E9E7132175C8 /* TransactionDetailView.swift */,
 				AC584E56DBBB28E780122466 /* TransactionEditor.swift */,
 				4DDC964FDA5A59ACE60D042D /* TransactionFilter.swift */,
@@ -484,6 +487,7 @@
 				DCD06C8B9E346EA35F131828 /* BillsView.swift in Sources */,
 				2C381A4D0F5DC96E7C22C894 /* BudgetsView.swift in Sources */,
 				596AEC7ACE02DBE9ED42CEDE /* CategoryChanger.swift in Sources */,
+				B94C5D44CF5942F53F2FC038 /* CategoryTrend.swift in Sources */,
 				2CC2D15068ED6F0ED2900025 /* ChatListView.swift in Sources */,
 				82DB61AA606C6BA1743CC80C /* ChatView.swift in Sources */,
 				09805744FF0483A8F69BC515 /* Components.swift in Sources */,

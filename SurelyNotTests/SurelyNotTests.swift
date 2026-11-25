@@ -488,6 +488,27 @@ private func decode<T: Decodable>(_ type: T.Type, _ json: String) throws -> T {
     }
 }
 
+@Suite struct CategoryTrendTests {
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        return calendar
+    }
+
+    @Test func theLastMonthsRunOldestFirstAcrossAYear() throws {
+        let months = MonthSpan.last(4, now: try #require(Day.date("2026-02-10")), calendar: calendar)
+        #expect(months.map(\.start) == ["2025-11-01", "2025-12-01", "2026-01-01", "2026-02-01"])
+        #expect(months.map(\.end) == ["2025-11-30", "2025-12-31", "2026-01-31", "2026-02-28"])
+    }
+
+    @Test func theUsualAmountLeavesOutTheRunningMonth() throws {
+        let months = MonthSpan.last(4, now: try #require(Day.date("2026-02-10")), calendar: calendar)
+        let totals = zip(months, [100.0, 200, 300, 5000]).map { MonthTotal(month: $0, amount: $1) }
+        #expect(MonthTotal.usual(totals) == 200)
+        #expect(MonthTotal.usual(Array(totals.suffix(2))) == nil)
+    }
+}
+
 @Suite struct WidgetSnapshotTests {
     private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
