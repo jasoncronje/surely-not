@@ -1,6 +1,17 @@
 # Surely Not
 
-Surely Not is an unofficial, community-built native iOS client (Swift / SwiftUI) for self-hosted [Sure](https://github.com/we-promise/sure), the open source personal finance app.
+![Surely Not: your money, in your pocket](docs/social-preview.png)
+
+**Your self-hosted money, in your pocket.** Surely Not is a native iPhone app for [Sure](https://github.com/we-promise/sure), the open source personal finance app you run on your own server.
+
+- **Know what's left to pay.** Bills finds each repeating payment in your transactions, so "7 of 11 paid" is right even when Sure's own record lags.
+- **Fix a category in one tap.** Tap a transaction's category, or press and hold the row, and move it.
+- **Bring your Apple Card.** Apple Card, Apple Cash and Savings go from Wallet on your phone straight to your Sure server. Nothing passes through anyone else.
+- **Glance, don't open.** Home and lock screen widgets show what's still due and how the month's budget is holding up, with amounts hidden while the phone is locked.
+
+Built in SwiftUI with no third-party code. Your sign-in stays in the iOS Keychain and the app talks only to the server you give it.
+
+This is a community project, not made by or affiliated with the Sure team.
 
 ## Status
 
@@ -29,7 +40,7 @@ Enter your server address, then sign in the way that server allows: single sign-
 These come from what Sure's API offers:
 
 - Budgets and accounts are read-only, apart from accounts that Apple Wallet sync adds. Create and change the rest in Sure on the web.
-- Apple Wallet sync has not been run against a real Apple Card yet. It is tested against Sure's own rules for uploads, not against Wallet itself.
+- Apple Wallet sync has been run against one real Apple Card so far. Apple Card bill payments arrive in Sure as income, not as transfers.
 - Chat replies are not streamed. The app checks for the reply every two seconds.
 - Only the first 50 messages of a very long chat are shown.
 - Single sign-on cannot link a new account or sign in an account that uses a two-factor code. Link the account in a browser first, or use email and password.
