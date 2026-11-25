@@ -122,6 +122,10 @@ nonisolated struct WalletUploader: WalletUploading {
         publisherId: String,
         credential: String
     ) async -> WalletUploadResult {
+        // Wallet data never leaves the phone unencrypted, whatever let it get this far.
+        guard baseURL.scheme?.lowercased() == "https" else {
+            return .unreachable("Wallet data is only sent over https://.")
+        }
         let url = baseURL.appending(path: "api/v1/financekit/publishers/\(publisherId)/batches")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"

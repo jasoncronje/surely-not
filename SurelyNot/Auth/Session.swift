@@ -3,10 +3,23 @@ import Observation
 import Security
 import UIKit
 
+/// How the person proved who they are when they signed in.
+nonisolated enum SignInMethod: String, Codable, Sendable {
+    /// Email and password alone.
+    case password
+    /// Email, password and a one-time code from an authenticator app.
+    case passwordWithCode
+    /// Another service, such as Pocket ID or Google, which does its own checks.
+    case singleSignOn
+    case apiKey
+}
+
 /// What is saved in the Keychain between launches.
 nonisolated struct SavedSession: Codable, Sendable, Equatable {
     let serverURL: URL
     var credential: Credential
+    /// Nil for a sign-in saved before the app kept this.
+    var signIn: SignInMethod?
 }
 
 /// Stores one small value in the Keychain. Sign-in secrets never go anywhere else.
@@ -128,6 +141,8 @@ nonisolated enum SingleSignOn {
 final class Session {
     private(set) var client: APIClient?
     private(set) var serverURL: URL?
+    /// How this sign-in was done, if the app knows. Apple Wallet sync depends on it.
+    private(set) var signInMethod: SignInMethod?
     /// Shown on the sign-in screen after the server ends the session.
     var notice: String?
 
@@ -169,13 +184,16 @@ final class Session {
             otpCode: otpCode,
             device: Self.deviceInfo
         )
-        store(SavedSession(serverURL: serverURL, credential: credential))
+        // The server only takes a code from an account that has two-factor on,
+        // and the sign-in screen only asks for one when the server wants it.
+        let method: SignInMethod = otpCode == nil ? .password : .passwordWithCode
+        store(SavedSession(serverURL: serverURL, credential: credential, signIn: method))
     }
 
     func signIn(serverURL: URL, ssoCode: String) async throws {
         let probe = APIClient(baseURL: serverURL, credential: nil, deviceID: Self.deviceID)
         let credential = try await probe.exchangeSSO(code: ssoCode)
-        store(SavedSession(serverURL: serverURL, credential: credential))
+        store(SavedSession(serverURL: serverURL, credential: credential, signIn: .singleSignOn))
     }
 
     func signIn(serverURL: URL, apiKey: String) async throws {
@@ -183,7 +201,7 @@ final class Session {
         let probe = APIClient(baseURL: serverURL, credential: credential, deviceID: Self.deviceID)
         // Any authenticated call proves the key works before it is saved.
         let _: BalanceSheet = try await probe.get("balance_sheet")
-        store(SavedSession(serverURL: serverURL, credential: credential))
+        store(SavedSession(serverURL: serverURL, credential: credential, signIn: .apiKey))
     }
 
     func signOut() {
@@ -192,6 +210,7 @@ final class Session {
         Task { await BillReminders.removeAll() }
         client = nil
         serverURL = nil
+        signInMethod = nil
     }
 
     private func store(_ saved: SavedSession) {
@@ -203,7 +222,7 @@ final class Session {
     private func activate(_ saved: SavedSession) {
         let client = APIClient(baseURL: saved.serverURL, credential: saved.credential, deviceID: Self.deviceID)
         client.onCredentialChange = { credential in
-            KeychainStore.save(SavedSession(serverURL: saved.serverURL, credential: credential))
+            KeychainStore.save(SavedSession(serverURL: saved.serverURL, credential: credential, signIn: saved.signIn))
         }
         client.onSessionExpired = { [weak self] in
             self?.notice = "You were signed out by the server. Please sign in again."
@@ -211,5 +230,6 @@ final class Session {
         }
         self.client = client
         serverURL = saved.serverURL
+        signInMethod = saved.signIn
     }
 }

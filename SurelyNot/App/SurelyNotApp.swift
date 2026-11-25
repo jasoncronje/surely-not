@@ -14,7 +14,7 @@ struct SurelyNotApp: App {
         WindowGroup {
             Group {
                 if let client = session.client {
-                    MainTabView(client: client)
+                    MainTabView(client: client, signIn: session.signInMethod)
                         // A new sign-in gets fresh screens with no data from the last one.
                         .id(ObjectIdentifier(client))
                 } else {
@@ -51,12 +51,12 @@ struct MainTabView: View {
     @State private var wallet: WalletSync
     @Environment(\.scenePhase) private var scenePhase
 
-    init(client: APIClient) {
+    init(client: APIClient, signIn: SignInMethod?) {
         self.client = client
         let changes = LedgerChanges()
         _changes = State(initialValue: changes)
         _categoryChanger = State(initialValue: CategoryChanger(client: client, changes: changes))
-        let wallet = WalletSync(client: client)
+        let wallet = WalletSync(client: client, signIn: signIn)
         // New Wallet data changes balances and lists across the app.
         wallet.onImported = { changes.noteChange() }
         _wallet = State(initialValue: wallet)

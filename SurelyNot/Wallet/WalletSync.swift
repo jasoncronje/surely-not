@@ -66,6 +66,33 @@ nonisolated struct WalletProblem: LocalizedError, Sendable, Equatable {
     }
 }
 
+/// Apple's rules for apps that read Wallet. They are part of the FinanceKit
+/// agreement, so the app holds itself to them instead of leaving it to chance.
+nonisolated enum WalletRules {
+    /// Why Wallet sync cannot be used with this server and this sign-in, or
+    /// nil when it can.
+    ///
+    /// Wallet data has to be encrypted on its way to the server, and the
+    /// person has to have signed in with a second step. A password alone and
+    /// an API key are one step. Single sign-on is allowed because the other
+    /// service does its own checks, which the app cannot see.
+    static func blockReason(serverURL: URL, signIn: SignInMethod?) -> String? {
+        guard serverURL.scheme?.lowercased() == "https" else {
+            return "Wallet data is only sent over https://. This Sure server is on http://, so Wallet sync is off for it."
+        }
+        switch signIn {
+        case .passwordWithCode, .singleSignOn:
+            return nil
+        case .password:
+            return "Wallet sync needs a sign-in with a second step. Turn on two-factor authentication in Sure, then sign out here and sign in again."
+        case .apiKey:
+            return "Wallet sync needs a sign-in with a second step, and an API key has none. Sign out, then sign in with your email, password and two-factor code, or with single sign-on."
+        case nil:
+            return "Sign out and sign in again, so the app can tell how you signed in. Wallet sync needs a sign-in with a second step."
+        }
+    }
+}
+
 nonisolated enum WalletSetup {
     /// How a Wallet account goes into Sure when Sure makes a new account for it.
     static func newAccountKind(for account: WalletAccount) -> (type: String, subtype: String, label: String) {
@@ -168,6 +195,8 @@ final class WalletSync {
     @ObservationIgnored private let store: WalletStore
     @ObservationIgnored private let secrets: any WalletSecretStore
     @ObservationIgnored private let serverKey: String
+    /// Why this server or this sign-in may not carry Wallet data, if so.
+    @ObservationIgnored private let blocked: String?
     @ObservationIgnored private var draft: WalletDraft?
     @ObservationIgnored private var lastAutomaticSync: Date?
 
@@ -195,7 +224,8 @@ final class WalletSync {
         source: any WalletSource,
         store: WalletStore,
         secrets: any WalletSecretStore,
-        serverKey: String
+        serverKey: String,
+        blocked: String? = nil
     ) {
         self.server = server
         self.uploader = uploader
@@ -203,19 +233,21 @@ final class WalletSync {
         self.store = store
         self.secrets = secrets
         self.serverKey = serverKey
+        self.blocked = blocked
         let state = store.load()
         link = state.link
         draft = state.draft
     }
 
-    convenience init(client: APIClient) {
+    convenience init(client: APIClient, signIn: SignInMethod?) {
         self.init(
             server: client,
             uploader: WalletUploader(baseURL: client.baseURL),
             source: FinanceKitSource(),
             store: WalletStore(serverURL: client.baseURL),
             secrets: WalletKeychain(),
-            serverKey: WalletStore.key(for: client.baseURL)
+            serverKey: WalletStore.key(for: client.baseURL),
+            blocked: WalletRules.blockReason(serverURL: client.baseURL, signIn: signIn)
         )
     }
 
@@ -237,7 +269,7 @@ final class WalletSync {
     /// Checks that this phone and this server can do Wallet sync, and how the
     /// connection is doing.
     func refresh() async {
-        if let reason = source.unavailableReason {
+        if let reason = source.unavailableReason ?? blocked {
             availability = .unavailable(reason)
             return
         }
@@ -314,6 +346,7 @@ final class WalletSync {
     /// own sheet the first time. Nil when Wallet could not be read.
     func walletAccounts() async -> [WalletAccount]? {
         var accounts: [WalletAccount]?
+        guard availability == .ready else { return nil }
         await work("Asking Wallet") {
             guard try await self.source.requestAuthorization() == .authorized else {
                 throw WalletProblem("This app is not allowed to read Wallet. Allow it in the Settings app, then try again.")
@@ -326,6 +359,7 @@ final class WalletSync {
     /// Connects the chosen Wallet accounts to Sure, then runs the first sync.
     @discardableResult
     func connect(_ choices: [WalletSetupChoice], importSince: Date?) async -> Bool {
+        guard availability == .ready else { return false }
         let connected = await work("Connecting to Sure") {
             guard !choices.isEmpty else {
                 throw WalletProblem("Choose at least one Wallet account.")

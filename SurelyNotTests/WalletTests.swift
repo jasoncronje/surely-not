@@ -813,3 +813,63 @@ private final class FakeServer: WalletServer {
         #expect(store.load() == WalletState())
     }
 }
+
+@Suite struct WalletRulesTests {
+    private let secure = URL(string: "https://sure.example")!
+
+    @Test func walletDataNeedsAnEncryptedServer() {
+        #expect(WalletRules.blockReason(serverURL: secure, signIn: .passwordWithCode) == nil)
+        let local = URL(string: "http://192.168.1.5:3000")!
+        #expect(WalletRules.blockReason(serverURL: local, signIn: .passwordWithCode)?.contains("https://") == true)
+    }
+
+    @Test func walletDataNeedsASignInWithASecondStep() {
+        #expect(WalletRules.blockReason(serverURL: secure, signIn: .singleSignOn) == nil)
+        #expect(WalletRules.blockReason(serverURL: secure, signIn: .password)?.contains("two-factor") == true)
+        #expect(WalletRules.blockReason(serverURL: secure, signIn: .apiKey)?.contains("API key") == true)
+        // A sign-in saved before the app kept track has to be done again.
+        #expect(WalletRules.blockReason(serverURL: secure, signIn: nil)?.contains("sign in again") == true)
+    }
+
+    @Test func aSavedSignInRemembersHowItWasDone() throws {
+        let saved = SavedSession(serverURL: secure, credential: .apiKey("k"), signIn: .apiKey)
+        let again = try JSONDecoder().decode(SavedSession.self, from: try JSONEncoder().encode(saved))
+        #expect(again == saved)
+        // One saved by an older version of the app has no record of it.
+        let older = try JSONEncoder().encode(SavedSession(serverURL: secure, credential: .apiKey("k")))
+        #expect(!String(decoding: older, as: UTF8.self).contains("signIn"))
+        #expect(try JSONDecoder().decode(SavedSession.self, from: older).signIn == nil)
+    }
+
+    @Test func aBlockedSignInCannotConnectOrSync() async {
+        let server = FakeServer()
+        let uploader = FakeUploader()
+        let wallet = WalletSync(
+            server: server, uploader: uploader, source: FakeSource(),
+            store: WalletStore(
+                serverURL: secure,
+                root: FileManager.default.temporaryDirectory.appending(path: "wallet-tests-\(UUID().uuidString)")
+            ),
+            secrets: FakeSecrets(), serverKey: "test",
+            blocked: WalletRules.blockReason(serverURL: secure, signIn: .apiKey)
+        )
+        await wallet.refresh()
+        guard case .unavailable(let why) = wallet.availability else {
+            Issue.record("Expected Wallet sync to be unavailable.")
+            return
+        }
+        #expect(why.contains("API key"))
+        #expect(await wallet.walletAccounts() == nil)
+        #expect(await wallet.connect([WalletSetupChoice(account: card(), target: nil)], importSince: nil) == false)
+        #expect(await wallet.sync() == false)
+        #expect(server.enrollments.isEmpty)
+        #expect(uploader.sent.isEmpty)
+    }
+
+    @Test func theUploaderRefusesAnUnencryptedServer() async {
+        let uploader = WalletUploader(baseURL: URL(string: "http://192.168.1.5:3000")!)
+        let batch = WalletQueuedBatch(batchId: "b", generation: 1, sequence: 1, digest: "d", recordCount: 1)
+        let result = await uploader.upload(Data("{}".utf8), batch: batch, publisherId: "p", credential: "k")
+        #expect(result == .unreachable("Wallet data is only sent over https://."))
+    }
+}

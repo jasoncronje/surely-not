@@ -24,6 +24,10 @@ struct WalletView: View {
                         .font(Theme.smallStrong)
                         .foregroundStyle(Theme.text)
                     }
+                    // A connection made earlier can still be closed.
+                    if wallet.isConnected {
+                        disconnectButton
+                    }
                 case .ready:
                     if let link = wallet.link {
                         connected(link)
@@ -177,6 +181,10 @@ struct WalletView: View {
             .foregroundStyle(Theme.muted)
             .padding(.horizontal, 4)
 
+        disconnectButton
+    }
+
+    private var disconnectButton: some View {
         Button("Disconnect Apple Wallet") {
             isConfirmingDisconnect = true
         }

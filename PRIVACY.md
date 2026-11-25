@@ -21,7 +21,8 @@ Wallet sync is off unless you connect it. If you do:
 
 - Apple shows its own sheet where you choose which Wallet accounts to share with the app. You can change or withdraw that in the Settings app at any time.
 - The app reads the accounts you chose, their balances and their transactions from Wallet on your device, using Apple's FinanceKit.
-- It sends them to your Sure server and nowhere else. Everyone in your Sure household can then see them there.
+- It sends them to your Sure server and nowhere else, and only over an encrypted (`https://`) connection. Everyone in your Sure household can then see them there.
+- Wallet sync only works if you signed in with a second step: a two-factor code or single sign-on.
 - Uploads waiting to be sent are kept in the app's own storage on your device, left out of device backups, and deleted once your server has taken them.
 - The key that lets the app upload is kept in the iOS Keychain. It can add Wallet data to your one connection and cannot read anything from Sure.
 - Disconnecting stops the uploads. You can keep what was imported in Sure or have Sure remove it.

@@ -49,7 +49,8 @@ What it needs:
 
 - **Apple's permission.** FinanceKit only works in an app with the `com.apple.developer.financekit` entitlement, and stops the app dead if it is called without it. Apple grants the entitlement on request, per app, to organisation developer accounts; the Account Holder has to ask ([Get started with FinanceKit](https://developer.apple.com/financekit)). Until Apple has granted it, leave Wallet sync off: a build signed with the entitlement before then will not install on a phone.
 - **A real iPhone** in a country where Wallet shares account data: the United States for Apple Card, Apple Cash and Savings, and the United Kingdom for connected bank accounts. The Simulator has no Wallet data.
-- **A current Sure server**, and a sign-in that is an administrator of the household. An API key has to be able to read and write.
+- **A current Sure server, reached over `https://`.** Wallet data is never sent over plain `http://`, not even on a local network.
+- **A sign-in with a second step**, by an administrator of the household: email, password and a two-factor code, or single sign-on. A password alone or an API key will not do. Apple's FinanceKit terms ask for both of these, so the app holds itself to them.
 
 To turn it on once Apple has granted the entitlement, create `Config/Local.xcconfig` (git ignores it) with:
 
