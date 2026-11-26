@@ -37,7 +37,7 @@
 	<string>Surely Not sends the Wallet accounts you choose, with their balances and transactions, to your own Sure server.</string>
 	<key>UIAppFonts</key>
 	<array>
-		<string>Manrope.ttf</string>
+		<string>Geist.ttf</string>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>

@@ -150,11 +150,12 @@ extension ScreenHeader where Trailing == EmptyView {
     }
 }
 
-/// A small tile with one letter, in the pale tint of whatever it stands for.
+/// A small round avatar with one letter, in the pale tint of whatever it
+/// stands for, as Sure draws categories and merchants.
 struct LetterTile: View {
     let name: String
     let tint: Tint
-    var round = false
+    var round = true
 
     var body: some View {
         Text(name.trimmingCharacters(in: .whitespaces).prefix(1).uppercased())
@@ -654,10 +655,11 @@ extension View {
         }
     }
 
-    /// A white panel holding rows edge to edge, with the card corner radius.
+    /// A white panel with Sure's hairline edge, holding rows edge to edge, with the card corner radius.
     func rowGroup() -> some View {
         background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
             .clipShape(.rect(cornerRadius: Theme.cardRadius))
+            .sureCardEdge()
     }
 
     /// The padded white panel of a card, for content that is not a `Card`,
@@ -665,6 +667,7 @@ extension View {
     func cardSurface() -> some View {
         padding(Theme.cardPadding)
             .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
+            .sureCardEdge()
     }
 
     /// The page background and default type for a screen.

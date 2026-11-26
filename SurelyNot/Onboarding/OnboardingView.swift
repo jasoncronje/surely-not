@@ -57,7 +57,7 @@ struct WelcomeView: View {
                 ProductMark(size: 36)
                     .padding(.bottom, 8)
                 Text("Your money,\nin your pocket.")
-                    .font(Theme.font(38, .bold, relativeTo: .largeTitle))
+                    .font(Theme.font(38, .semibold, relativeTo: .largeTitle))
                     .foregroundStyle(Theme.text)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(Self.pitch)
@@ -141,6 +141,7 @@ private struct WelcomePreview: View {
         .padding(Theme.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
+        .sureCardEdge()
         .onChange(of: shown, initial: true) {
             guard shown else { return }
             if reduceMotion {

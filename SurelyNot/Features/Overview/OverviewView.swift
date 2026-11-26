@@ -199,10 +199,7 @@ struct OverviewView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 10) {
-                ProductMark(size: 30)
-                Text("Surely Not")
-                    .font(Theme.title)
-                    .foregroundStyle(Theme.text)
+                ProductMark(size: 40, label: "Sure")
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
                 Button("Settings", systemImage: "gearshape") {

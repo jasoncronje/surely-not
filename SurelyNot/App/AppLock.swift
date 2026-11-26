@@ -196,10 +196,7 @@ private struct LockCover: View {
     var body: some View {
         VStack(spacing: 16) {
             Spacer()
-            ProductMark(size: 44)
-            Text("Surely Not")
-                .font(Theme.title)
-                .foregroundStyle(Theme.text)
+            ProductMark(size: 72)
             if lock.cover == .locked {
                 Text("Locked")
                     .font(Theme.body)

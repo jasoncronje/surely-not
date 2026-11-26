@@ -37,7 +37,7 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         ITSAppUsesNonExemptEncryption: false
-        UIAppFonts: [Manrope.ttf]
+        UIAppFonts: [Geist.ttf]
         NSFaceIDUsageDescription: Surely Not uses Face ID to keep your finances private when the lock is on.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true

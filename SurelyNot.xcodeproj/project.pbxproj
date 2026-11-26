@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		08108A86D15E3FE461025C15 /* WalletSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5C68D1CDFE51092A71932C1 /* WalletSync.swift */; };
 		09805744FF0483A8F69BC515 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8E9480CCBDB77A763941886 /* Components.swift */; };
-		0F20215173E31C9A536017DB /* Manrope.ttf in Resources */ = {isa = PBXBuildFile; fileRef = E106363FDAD77D35497D5B88 /* Manrope.ttf */; };
 		104CA452475FA649CE3B213C /* AppLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 908802C8497D49ABD5D968A7 /* AppLock.swift */; };
 		14418A5AFC73ACDA3E65A96C /* WidgetFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F012E72B440AFA10D5254AB /* WidgetFeed.swift */; };
 		1B5412CE5B5907E6790F657C /* WalletSyncExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = D06DBF1027F33311589E8CA5 /* WalletSyncExtension.swift */; };
@@ -35,6 +34,7 @@
 		45497040DCBCCA45226F1337 /* BillReminders.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6EB416CB2EDA61AD76880D4 /* BillReminders.swift */; };
 		47C8FBAF11C92510CCAE7C27 /* WalletShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BDFFF4CCD32C59B4304BC9B /* WalletShared.swift */; };
 		48F4217D112121D00D4DA378 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86D0CF2AC0975810E329A155 /* Session.swift */; };
+		4B6D4722F8CEB405971564B1 /* Geist.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 4C2CADE02385C376D4377575 /* Geist.ttf */; };
 		505D17BCE113B0DB6CE81A70 /* WalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C621F1AF5BCA81DC8F4F446 /* WalletView.swift */; };
 		539E90A967744BFE46C85B22 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 590161F90D4418956DFE9AF7 /* Assets.xcassets */; };
 		596AEC7ACE02DBE9ED42CEDE /* CategoryChanger.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9293F1B6360A257BE14C41E /* CategoryChanger.swift */; };
@@ -138,6 +138,7 @@
 		482C04775D0FD66092BC7CB6 /* WalletStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletStore.swift; sourceTree = "<group>"; };
 		49B5F7DFEECB0E9D879D3FA0 /* WalletWire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletWire.swift; sourceTree = "<group>"; };
 		4A97C186A4880D962252D426 /* BillsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BillsView.swift; sourceTree = "<group>"; };
+		4C2CADE02385C376D4377575 /* Geist.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Geist.ttf; sourceTree = "<group>"; };
 		4DDC964FDA5A59ACE60D042D /* TransactionFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionFilter.swift; sourceTree = "<group>"; };
 		4F012E72B440AFA10D5254AB /* WidgetFeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetFeed.swift; sourceTree = "<group>"; };
 		504FB03E6A665E17D90738F2 /* SampleServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleServer.swift; sourceTree = "<group>"; };
@@ -184,7 +185,6 @@
 		DBA4DE44672E0098B35C6995 /* WalletTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletTests.swift; sourceTree = "<group>"; };
 		DCBE6A8349BA4D7B954E2963 /* Wallet.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Wallet.entitlements; sourceTree = "<group>"; };
 		DFEF98CDE2694B1ABF5CD3E3 /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
-		E106363FDAD77D35497D5B88 /* Manrope.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = Manrope.ttf; sourceTree = "<group>"; };
 		E333C0CEFA5A807E01EEE461 /* Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatting.swift; sourceTree = "<group>"; };
 		E993B68C650F2B6AFAE24385 /* AppKeepAwake.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKeepAwake.swift; sourceTree = "<group>"; };
 		EA557AD334CA69BC5514524F /* InvestmentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InvestmentsView.swift; sourceTree = "<group>"; };
@@ -347,7 +347,7 @@
 		9E855C2996F12A782C30C462 /* Fonts */ = {
 			isa = PBXGroup;
 			children = (
-				E106363FDAD77D35497D5B88 /* Manrope.ttf */,
+				4C2CADE02385C376D4377575 /* Geist.ttf */,
 				5D40DFD885781AD7BD42C06A /* OFL.txt */,
 			);
 			path = Fonts;
@@ -588,7 +588,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				539E90A967744BFE46C85B22 /* Assets.xcassets in Resources */,
-				0F20215173E31C9A536017DB /* Manrope.ttf in Resources */,
+				4B6D4722F8CEB405971564B1 /* Geist.ttf in Resources */,
 				C2840769FFA800E764021AF9 /* OFL.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

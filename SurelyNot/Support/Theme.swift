@@ -3,38 +3,56 @@ import UIKit
 
 /// The app's look in one place: colours, type and measurements.
 ///
-/// The rules behind it: colour belongs on data, not on buttons and bars.
-/// The one blue marks the main thing a screen is about. Categories and
-/// institutions get a pale tint of their own colour. Surfaces are flat, with
-/// one large corner radius. Money coming in is green with a plus sign, and red
-/// is kept for what is actually over or wrong.
+/// Taken from Sure's own design system (`design/tokens/sure.tokens.json` in
+/// we-promise/sure, also used by Sure's Flutter app), so the phone matches
+/// Sure on the web: neutral greys, white containers on a pale grey page,
+/// near-black buttons, Geist type and Sure's blue for links and the main
+/// figure. Colour belongs on data. Money coming in is Sure's success green,
+/// and red is kept for what is actually over or wrong.
 enum Theme {
     // MARK: Colour
 
-    static let ground = Color(light: 0xF3F5F7, dark: 0x000000)
-    static let surface = Color(light: 0xFFFFFF, dark: 0x111111)
-    static let raised = Color(light: 0xEEF1F4, dark: 0x222222)
-    static let rule = Color(light: 0xEEF0F2, dark: 0x1E1E1E)
-    static let control = Color(light: 0xD6D9DD, dark: 0x444444)
-    static let text = Color(light: 0x1B1D1F, dark: 0xFFFFFF)
-    static let muted = Color(light: 0x5C6064, dark: 0xB4B4B4)
-    /// Fill of the main action. Near-black, so buttons do not compete with data.
-    static let primary = Color(light: 0x1B1D1F, dark: 0xFFFFFF)
-    static let onPrimary = Color(light: 0xFFFFFF, dark: 0x000000)
-    /// The one data colour.
-    static let accent = Color(light: 0x1D5FD6, dark: 0x5B93F0)
-    static let positive = Color(light: 0x2F7A45, dark: 0x3FC07A)
-    static let negative = Color(light: 0xC41C29, dark: 0xE5566F)
-    static let warning = Color(light: 0x92400E, dark: 0xD9A441)
-    /// The quiet series in a chart and the empty part of a bar.
-    static let track = Color(light: 0xDDE1E6, dark: 0x2B2B2B)
-    static let grid = Color(light: 0xE5E5E5, dark: 0x2B2B2B)
+    /// Sure's `surface`: the page behind everything.
+    static let ground = Color(light: 0xF7F7F7, dark: 0x0B0B0B)
+    /// Sure's `container`: cards and panels.
+    static let surface = Color(light: 0xFFFFFF, dark: 0x171717)
+    /// Sure's `surface-inset`: fields, chips and pressed rows.
+    static let raised = Color(light: 0xF0F0F0, dark: 0x242424)
+    /// Sure's `border-subdued` hairline between rows.
+    static let rule = Color(light: 0xEBEBEB, dark: 0x2A2A2A)
+    /// The hairline ring around a card, Sure's `shadow-border-xs`.
+    static let ring = Color(light: 0x0B0B0B, dark: 0xFFFFFF).opacity(0.06)
+    static let control = Color(light: 0xCFCFCF, dark: 0x363636)
+    /// Sure's `text-primary`.
+    static let text = Color(light: 0x171717, dark: 0xFFFFFF)
+    /// Sure's `text-secondary`.
+    static let muted = Color(light: 0x737373, dark: 0xCFCFCF)
+    /// Sure's `text-subdued`.
+    static let subdued = Color(light: 0x9E9E9E, dark: 0x9E9E9E)
+    /// Fill of the main action: Sure's `button-bg-primary`.
+    static let primary = Color(light: 0x171717, dark: 0xFFFFFF)
+    static let onPrimary = Color(light: 0xFFFFFF, dark: 0x171717)
+    /// The one data colour: Sure's `link` and `info` blue.
+    static let accent = Color(light: 0x1570EF, dark: 0x2E90FA)
+    /// Sure's `success`.
+    static let positive = Color(light: 0x078C52, dark: 0x32D583)
+    /// Sure's `destructive`.
+    static let negative = Color(light: 0xEC2222, dark: 0xED4E4E)
+    /// Sure's `warning`.
+    static let warning = Color(light: 0xB54708, dark: 0xFDB022)
+    /// The quiet series in a chart and the empty part of a bar
+    /// (Sure's `budget-unused-fill`).
+    static let track = Color(light: 0xE7E7E7, dark: 0x363636)
+    static let grid = Color(light: 0xE7E7E7, dark: 0x2A2A2A)
+    /// The two greens of Sure's logomark.
+    static let brandGreen = Color(rgb: 0x61A446)
 
     // MARK: Measurements
 
-    static let cardRadius: CGFloat = 20
+    /// Sure's cards are `rounded-xl`; controls and tiles `rounded-lg`.
+    static let cardRadius: CGFloat = 12
     static let controlRadius: CGFloat = 10
-    static let tileRadius: CGFloat = 10
+    static let tileRadius: CGFloat = 8
     static let gap: CGFloat = 16
     static let cardPadding: CGFloat = 20
     static let margin: CGFloat = 16
@@ -44,16 +62,16 @@ enum Theme {
 
     // MARK: Type
 
-    static let fontName = "Manrope"
+    static let fontName = "Geist"
 
-    /// Manrope at a size that follows the person's text-size setting.
+    /// Geist, Sure's typeface, at a size that follows the person's text-size setting.
     static func font(_ size: CGFloat, _ weight: Font.Weight = .regular, relativeTo style: Font.TextStyle = .body) -> Font {
         .custom(fontName, size: size, relativeTo: style).weight(weight)
     }
 
-    static let title = font(28, .semibold, relativeTo: .title)
-    static let section = font(20, .regular, relativeTo: .title3)
-    static let figure = font(32, .semibold, relativeTo: .largeTitle)
+    static let title = font(26, .semibold, relativeTo: .title)
+    static let section = font(18, .medium, relativeTo: .title3)
+    static let figure = font(30, .medium, relativeTo: .largeTitle)
     static let body = font(16, .regular, relativeTo: .body)
     static let bodyStrong = font(16, .semibold, relativeTo: .body)
     static let small = font(14, .regular, relativeTo: .subheadline)
@@ -68,7 +86,7 @@ enum Theme {
     /// The round mark of a choice that can be picked.
     static let glyphLarge = Font.system(size: 22)
 
-    /// Applies Manrope to the navigation and tab bars, which SwiftUI does not
+    /// Applies Geist to the navigation and tab bars, which SwiftUI does not
     /// reach through the environment.
     static func applyBarAppearance() {
         func barFont(_ size: CGFloat, _ weight: UIFont.Weight) -> UIFont {
@@ -179,26 +197,26 @@ struct Tint {
     }
 }
 
-/// The app's mark: a tick with a stroke through it. Sure, with a "not".
+/// Sure's logomark: "su" over "re", grey and green.
 struct ProductMark: View {
     var size: CGFloat = 28
-    var color: Color = Theme.accent
+    /// Spoken by VoiceOver when set; otherwise the mark is decoration.
+    var label: String?
 
     var body: some View {
-        Canvas { context, canvas in
-            let unit = canvas.width / 24
-            var tick = Path()
-            tick.move(to: CGPoint(x: 3.5 * unit, y: 12.5 * unit))
-            tick.addLine(to: CGPoint(x: 9.5 * unit, y: 18.5 * unit))
-            tick.addLine(to: CGPoint(x: 20.5 * unit, y: 5.5 * unit))
-            var strike = Path()
-            strike.move(to: CGPoint(x: 11.5 * unit, y: 5 * unit))
-            strike.addLine(to: CGPoint(x: 20.5 * unit, y: 16 * unit))
-            let style = StrokeStyle(lineWidth: 2.8 * unit, lineCap: .round, lineJoin: .round)
-            context.stroke(tick, with: .color(color), style: style)
-            context.stroke(strike, with: .color(color), style: style)
-        }
-        .frame(width: size, height: size)
-        .accessibilityHidden(true)
+        Image(decorative: "SureLogomark")
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .accessibilityHidden(label == nil)
+            .accessibilityLabel(label ?? "")
+    }
+}
+
+extension View {
+    /// Sure's card edge: a 1pt shadow and a hairline ring, `shadow-border-xs`.
+    func sureCardEdge(radius: CGFloat = Theme.cardRadius) -> some View {
+        overlay(RoundedRectangle(cornerRadius: radius).strokeBorder(Theme.ring, lineWidth: 1))
+            .shadow(color: .black.opacity(0.06), radius: 1, x: 0, y: 1)
     }
 }
