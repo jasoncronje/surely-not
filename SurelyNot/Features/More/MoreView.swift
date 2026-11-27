@@ -25,6 +25,13 @@ struct MoreView: View {
                             // accounts it feeds, so it has no row of its own here.
                             MoreRow(title: "Accounts", detail: "Balances and Apple Wallet sync", systemImage: "building.columns")
                         }
+                        if !client.isSample {
+                            NavigationLink {
+                                ConnectionsView(client: client)
+                            } label: {
+                                MoreRow(title: "Connections", detail: "Banks Sure syncs from, and when", systemImage: "link")
+                            }
+                        }
                         NavigationLink {
                             InvestmentsView(client: client)
                         } label: {

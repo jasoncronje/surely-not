@@ -210,8 +210,16 @@ struct AccountsView: View {
                             .buttonStyle(RowButtonStyle())
                             .rowGroup()
                         }
-                        if !model.connections.isEmpty {
-                            connectionsCard
+                        // Connections live on their own screen. One shows
+                        // here only when it needs reconnecting.
+                        if !brokenConnections.isEmpty {
+                            Button {
+                                isFixingConnection = true
+                            } label: {
+                                ReconnectBanner(names: brokenConnections.map(\.title))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityHint("Opens Sure's website to reconnect")
                         }
                         ForEach(summary.groups) { group in
                             groupCard(group)
@@ -270,35 +278,8 @@ struct AccountsView: View {
         }
     }
 
-    /// Each bank or service Sure pulls from, and how its last sync went.
-    /// One that needs signing in again opens Sure's page to fix it.
-    private var connectionsCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Connections")
-                .font(Theme.section)
-                .foregroundStyle(Theme.text)
-                .padding(.horizontal, 4)
-                .padding(.top, 8)
-            VStack(spacing: 0) {
-                ForEach(Array(model.connections.enumerated()), id: \.element.id) { index, connection in
-                    if index > 0 {
-                        RowRule(inset: .tile)
-                    }
-                    if connection.needsAttention {
-                        Button {
-                            isFixingConnection = true
-                        } label: {
-                            ConnectionRow(connection: connection, isSyncingAll: model.isSyncing)
-                        }
-                        .buttonStyle(RowButtonStyle())
-                        .accessibilityHint("Opens Sure's website to reconnect")
-                    } else {
-                        ConnectionRow(connection: connection, isSyncingAll: model.isSyncing)
-                    }
-                }
-            }
-            .rowGroup()
-        }
+    private var brokenConnections: [ProviderConnection] {
+        model.connections.filter(\.needsAttention)
     }
 
     private func groupCard(_ group: AccountGroup) -> some View {
@@ -377,62 +358,6 @@ private struct AccountRow: View {
                     .monospacedDigit()
                     // A zero balance steps back so the accounts with money stand out.
                     .foregroundStyle(account.balanceCents == 0 ? Theme.muted : Theme.text)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(minHeight: 68)
-        .contentShape(.rect)
-        .accessibilityElement(children: .combine)
-    }
-}
-
-/// One bank or service Sure pulls from: its name, and when it last synced.
-private struct ConnectionRow: View {
-    let connection: ProviderConnection
-    /// True while the app is waiting on a sync of everything.
-    let isSyncingAll: Bool
-
-    private var note: String {
-        if connection.needsAttention { return "Needs reconnecting. Tap to fix on Sure." }
-        if connection.isSyncing || isSyncingAll { return "Syncing…" }
-        var parts: [String] = []
-        if connection.lastSyncFailed {
-            parts.append("Last sync failed")
-        } else if let date = connection.lastSynced {
-            parts.append("Synced \(SyncClock.ago(date))")
-        } else {
-            parts.append("Not synced yet")
-        }
-        if let summary = connection.sync?.statusSummary, !summary.isEmpty, !connection.lastSyncFailed {
-            parts.append(summary)
-        }
-        return parts.joined(separator: " · ")
-    }
-
-    private var isWarning: Bool {
-        connection.needsAttention || (connection.lastSyncFailed && !connection.isSyncing && !isSyncingAll)
-    }
-
-    var body: some View {
-        HStack(spacing: 12) {
-            LetterTile(name: connection.title, tint: Tint(name: connection.title), round: true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(connection.title)
-                    .font(Theme.body)
-                    .foregroundStyle(Theme.text)
-                    .lineLimit(1)
-                Text(note)
-                    .font(Theme.small)
-                    .foregroundStyle(isWarning ? Theme.warning : Theme.muted)
-                    .lineLimit(2)
-            }
-            Spacer(minLength: 8)
-            if connection.needsAttention {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(Theme.glyphSmall)
-                    .foregroundStyle(Theme.warning)
-                    .accessibilityHidden(true)
             }
         }
         .padding(.horizontal, 16)
