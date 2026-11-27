@@ -102,6 +102,14 @@ final class AccountsModel {
         self.client = client
     }
 
+    /// The banks and services Sure pulls from. Empty when there are none or
+    /// the server could not say.
+    var connections: [ProviderConnection] = []
+    /// How each account's syncing stands, by account id.
+    var syncStatus: [String: AccountSyncStatus] = [:]
+    var isSyncing = false
+    var syncError: String?
+
     func load() async {
         summary = await .fetching(keeping: summary) {
             async let accounts = client.accounts()
@@ -110,6 +118,52 @@ final class AccountsModel {
             try Task.checkCancellation()
             return AccountsSummary(accounts: try await accounts, sheet: sheet)
         }
+        await loadSyncState()
+    }
+
+    /// Sync details are a nicety too: an older server without them just
+    /// shows no sync lines.
+    func loadSyncState() async {
+        guard !client.isSample else { return }
+        async let connectionList = try? client.providerConnections()
+        async let syncList = try? client.recentSyncs()
+        let (loadedConnections, loadedSyncs) = await (connectionList, syncList)
+        if let loadedConnections {
+            connections = loadedConnections.filter { $0.scheduledForDeletion != true }
+        }
+        if let loadedSyncs {
+            syncStatus = AccountSyncStatus.byAccount(from: loadedSyncs)
+        }
+    }
+
+    /// Syncs everything, waits for Sure to finish (up to five minutes), then
+    /// reloads. Sure syncs in the background, so leaving the screen is fine.
+    func syncAll() async {
+        guard !isSyncing else { return }
+        isSyncing = true
+        defer { isSyncing = false }
+        do {
+            let queued = try await client.startSync()
+            await loadSyncState()
+            let deadline = Date.now.addingTimeInterval(300)
+            while Date.now < deadline {
+                try await Task.sleep(for: .seconds(3))
+                guard let sync = try await client.sync(id: queued.id) else { break }
+                if sync.isFinished {
+                    if sync.didFail {
+                        syncError = sync.error?.message.map { "\($0). Some accounts may not have updated." }
+                            ?? "Sure could not finish the sync. Some accounts may not have updated."
+                    }
+                    break
+                }
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            syncError = error.localizedDescription
+            return
+        }
+        await load()
     }
 }
 
@@ -118,6 +172,7 @@ struct AccountsView: View {
     @Environment(LedgerChanges.self) private var changes
     @State private var model: AccountsModel
     @State private var isAddingOnWeb = false
+    @State private var isFixingConnection = false
 
     init(client: APIClient) {
         self.client = client
@@ -155,6 +210,9 @@ struct AccountsView: View {
                             .buttonStyle(RowButtonStyle())
                             .rowGroup()
                         }
+                        if !model.connections.isEmpty {
+                            connectionsCard
+                        }
                         ForEach(summary.groups) { group in
                             groupCard(group)
                         }
@@ -173,6 +231,27 @@ struct AccountsView: View {
             .screenBackground()
             .navigationTitle("Accounts")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if !client.isSample {
+                    ToolbarItem(placement: .primaryAction) {
+                        if model.isSyncing {
+                            ProgressView()
+                                .accessibilityLabel("Syncing")
+                        } else {
+                            Button("Sync all", systemImage: "arrow.triangle.2.circlepath") {
+                                Task { await model.syncAll() }
+                            }
+                        }
+                    }
+                }
+            }
+            .errorSheet(Binding(get: { model.syncError }, set: { model.syncError = $0 }), title: "Sync did not finish")
+            .sheet(isPresented: $isFixingConnection, onDismiss: {
+                Task { await model.load() }
+            }) {
+                SafariView(url: client.baseURL.appending(path: "settings/providers"))
+                    .ignoresSafeArea()
+            }
             .refreshable { await model.load() }
             // Sure's API cannot make accounts, so this opens Sure's own page
             // for it. The list reloads when the page closes.
@@ -188,6 +267,37 @@ struct AccountsView: View {
             .onChange(of: changes.version) {
                 Task { await model.load() }
             }
+        }
+    }
+
+    /// Each bank or service Sure pulls from, and how its last sync went.
+    /// One that needs signing in again opens Sure's page to fix it.
+    private var connectionsCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Connections")
+                .font(Theme.section)
+                .foregroundStyle(Theme.text)
+                .padding(.horizontal, 4)
+                .padding(.top, 8)
+            VStack(spacing: 0) {
+                ForEach(Array(model.connections.enumerated()), id: \.element.id) { index, connection in
+                    if index > 0 {
+                        RowRule(inset: .tile)
+                    }
+                    if connection.needsAttention {
+                        Button {
+                            isFixingConnection = true
+                        } label: {
+                            ConnectionRow(connection: connection, isSyncingAll: model.isSyncing)
+                        }
+                        .buttonStyle(RowButtonStyle())
+                        .accessibilityHint("Opens Sure's website to reconnect")
+                    } else {
+                        ConnectionRow(connection: connection, isSyncingAll: model.isSyncing)
+                    }
+                }
+            }
+            .rowGroup()
         }
     }
 
@@ -216,9 +326,9 @@ struct AccountsView: View {
                     // popped straight back: Accounts is itself pushed by a view
                     // link from More, and SwiftUI drops value pushes on top of it.
                     NavigationLink {
-                        AccountDetailView(client: client, account: account)
+                        AccountDetailView(client: client, account: account, sync: model.syncStatus[account.id])
                     } label: {
-                        AccountRow(account: account)
+                        AccountRow(account: account, sync: model.syncStatus[account.id])
                     }
                     .buttonStyle(RowButtonStyle())
                 }
@@ -230,6 +340,14 @@ struct AccountsView: View {
 
 private struct AccountRow: View {
     let account: Account
+    var sync: AccountSyncStatus?
+
+    /// "Chase · Synced 3 hr ago", or whichever half is known.
+    private var detail: String? {
+        let institution = account.institutionName.flatMap { $0.isEmpty ? nil : $0 }
+        let parts = [institution, sync?.summary].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
 
     /// The institution names the account; an account without one uses its own name.
     private var owner: String {
@@ -246,10 +364,10 @@ private struct AccountRow: View {
                         .font(Theme.body)
                         .foregroundStyle(Theme.text)
                         .lineLimit(1)
-                    if let institution = account.institutionName, !institution.isEmpty {
-                        Text(institution)
+                    if let detail {
+                        Text(detail)
                             .font(Theme.small)
-                            .foregroundStyle(Theme.muted)
+                            .foregroundStyle(sync?.lastFailed == true && sync?.isSyncing != true ? Theme.warning : Theme.muted)
                             .lineLimit(1)
                     }
                 }
@@ -259,6 +377,62 @@ private struct AccountRow: View {
                     .monospacedDigit()
                     // A zero balance steps back so the accounts with money stand out.
                     .foregroundStyle(account.balanceCents == 0 ? Theme.muted : Theme.text)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .frame(minHeight: 68)
+        .contentShape(.rect)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// One bank or service Sure pulls from: its name, and when it last synced.
+private struct ConnectionRow: View {
+    let connection: ProviderConnection
+    /// True while the app is waiting on a sync of everything.
+    let isSyncingAll: Bool
+
+    private var note: String {
+        if connection.needsAttention { return "Needs reconnecting. Tap to fix on Sure." }
+        if connection.isSyncing || isSyncingAll { return "Syncing…" }
+        var parts: [String] = []
+        if connection.lastSyncFailed {
+            parts.append("Last sync failed")
+        } else if let date = connection.lastSynced {
+            parts.append("Synced \(SyncClock.ago(date))")
+        } else {
+            parts.append("Not synced yet")
+        }
+        if let summary = connection.sync?.statusSummary, !summary.isEmpty, !connection.lastSyncFailed {
+            parts.append(summary)
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private var isWarning: Bool {
+        connection.needsAttention || (connection.lastSyncFailed && !connection.isSyncing && !isSyncingAll)
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            LetterTile(name: connection.title, tint: Tint(name: connection.title), round: true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(connection.title)
+                    .font(Theme.body)
+                    .foregroundStyle(Theme.text)
+                    .lineLimit(1)
+                Text(note)
+                    .font(Theme.small)
+                    .foregroundStyle(isWarning ? Theme.warning : Theme.muted)
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 8)
+            if connection.needsAttention {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(Theme.glyphSmall)
+                    .foregroundStyle(Theme.warning)
+                    .accessibilityHidden(true)
             }
         }
         .padding(.horizontal, 16)

@@ -915,3 +915,75 @@ private func decode<T: Decodable>(_ type: T.Type, _ json: String) throws -> T {
         #expect(query["max_amount"] == "261.79")
     }
 }
+
+@Suite struct SyncTests {
+    @Test func decodesProviderConnections() throws {
+        let list = try decode(DataList<ProviderConnection>.self, """
+        {"data":[{"id":"c1","provider":"simplefin","provider_type":"SimplefinItem","name":"SimpleFIN",
+          "status":"good","requires_update":false,"credentials_configured":true,"scheduled_for_deletion":false,
+          "pending_account_setup":false,"institution":{"name":"Example Bank","domain":null,"url":null},
+          "accounts":{"total_count":3,"linked_count":3,"unlinked_count":0},
+          "sync":{"syncing":false,"status_summary":"3 accounts synced","last_synced_at":"2026-11-26T08:15:02.123Z",
+            "latest":{"id":"s1","status":"completed","created_at":"2026-11-26T08:14:00.000Z",
+              "syncing_at":null,"completed_at":"2026-11-26T08:15:02.123Z","failed_at":null,"error":null}},
+          "created_at":"2026-01-01T00:00:00.000Z","updated_at":"2026-11-26T08:15:02.123Z"},
+         {"id":"c2","provider":"plaid","name":null,"status":"requires_update","requires_update":true,
+          "institution":null,"sync":{"syncing":false,"status_summary":null,"last_synced_at":null,"latest":null}}]}
+        """)
+        #expect(list.data.count == 2)
+        #expect(list.data[0].title == "Example Bank")
+        #expect(list.data[0].lastSynced != nil)
+        #expect(list.data[0].needsAttention == false)
+        #expect(list.data[1].title == "Plaid")
+        #expect(list.data[1].needsAttention)
+    }
+
+    @Test func decodesSyncPageAndSingleSync() throws {
+        let list = try decode(DataList<SyncRecord>.self, """
+        {"data":[{"id":"s1","status":"syncing","in_progress":true,"terminal":false,
+          "syncable":{"type":"Family","id":"f1","name":null},"parent_id":null,"children_count":4,
+          "completed_at":null,"failed_at":null,"error":null,"created_at":"2026-11-26T08:14:00.000Z"}],
+         "meta":{"page":1,"per_page":100,"total_count":150,"total_pages":2}}
+        """)
+        #expect(list.data[0].isRunning)
+        #expect(list.hasMore)
+        let one = try decode(DataItem<SyncRecord>.self, """
+        {"data":{"id":"s1","status":"failed","in_progress":false,"terminal":true,"error":{"message":"Sync failed"}}}
+        """)
+        #expect(one.data?.isFinished == true)
+        #expect(one.data?.didFail == true)
+        let none = try decode(DataItem<SyncRecord>.self, #"{"data":null}"#)
+        #expect(none.data == nil)
+    }
+
+    private func sync(_ account: String, _ status: String, completed: String? = nil) -> SyncRecord {
+        SyncRecord(
+            id: UUID().uuidString, status: status, inProgress: nil, terminal: nil,
+            syncable: .init(type: "Account", id: account, name: nil),
+            completedAt: completed, failedAt: nil, createdAt: nil, error: nil
+        )
+    }
+
+    @Test func accountStatusUsesNewestOfEach() {
+        let syncs = [
+            sync("a", "syncing"),
+            sync("a", "completed", completed: "2026-11-26T08:00:00Z"),
+            sync("b", "failed"),
+            sync("b", "completed", completed: "2026-11-25T08:00:00Z"),
+            sync("c", "completed", completed: "2026-11-26T09:00:00.500Z"),
+            sync("c", "failed"),
+            SyncRecord(id: "f", status: "completed", inProgress: nil, terminal: nil,
+                       syncable: .init(type: "Family", id: "f1", name: nil),
+                       completedAt: "2026-11-26T09:00:00Z", failedAt: nil, createdAt: nil, error: nil),
+        ]
+        let status = AccountSyncStatus.byAccount(from: syncs)
+        #expect(status.count == 3)
+        #expect(status["a"]?.isSyncing == true)
+        #expect(status["a"]?.summary == "Syncing…")
+        #expect(status["a"]?.lastSynced != nil)
+        #expect(status["b"]?.lastFailed == true)
+        #expect(status["b"]?.summary == "Last sync failed")
+        #expect(status["c"]?.lastFailed == false)
+        #expect(status["c"]?.summary?.hasPrefix("Synced") == true)
+    }
+}

@@ -517,3 +517,167 @@ nonisolated struct ErrorResponse: Decodable, Sendable {
     /// Set when sign-in needs a two-factor code as well.
     let mfaRequired: Bool?
 }
+
+// MARK: - Syncs and connections
+
+/// One sync Sure ran or is running: of the whole household, a bank
+/// connection, or one account.
+nonisolated struct SyncRecord: Decodable, Sendable, Identifiable {
+    struct Syncable: Decodable, Sendable {
+        let type: String?
+        let id: String?
+        let name: String?
+    }
+
+    struct Failure: Decodable, Sendable {
+        let message: String?
+    }
+
+    let id: String
+    let status: String?
+    let inProgress: Bool?
+    let terminal: Bool?
+    let syncable: Syncable?
+    let completedAt: String?
+    let failedAt: String?
+    let createdAt: String?
+    let error: Failure?
+
+    var isRunning: Bool { inProgress ?? (status == "pending" || status == "syncing") }
+    var isFinished: Bool { terminal ?? ["completed", "failed", "stale"].contains(status ?? "") }
+    var didFail: Bool { status == "failed" || status == "stale" }
+}
+
+/// Sure wraps its newer lists in `data`, with paging under `meta`.
+nonisolated struct DataList<Item: Decodable & Sendable>: Decodable, Sendable {
+    struct Meta: Decodable, Sendable {
+        let page: Int?
+        let totalPages: Int?
+    }
+
+    let data: [Item]
+    let meta: Meta?
+
+    var hasMore: Bool {
+        guard let page = meta?.page, let total = meta?.totalPages else { return false }
+        return page < total
+    }
+}
+
+nonisolated struct DataItem<Item: Decodable & Sendable>: Decodable, Sendable {
+    let data: Item?
+}
+
+/// What Sure sends back when it has queued a sync.
+nonisolated struct QueuedSync: Decodable, Sendable {
+    let id: String
+    let status: String?
+}
+
+/// A bank or other service Sure pulls accounts from, and how its syncing went.
+nonisolated struct ProviderConnection: Decodable, Sendable, Identifiable {
+    struct Institution: Decodable, Sendable {
+        let name: String?
+    }
+
+    struct SyncState: Decodable, Sendable {
+        let syncing: Bool?
+        let statusSummary: String?
+        let lastSyncedAt: String?
+        let latest: SyncRecord.Latest?
+    }
+
+    let id: String
+    let provider: String?
+    let name: String?
+    let status: String?
+    let requiresUpdate: Bool?
+    let scheduledForDeletion: Bool?
+    let institution: Institution?
+    let sync: SyncState?
+
+    var title: String {
+        if let name = institution?.name, !name.isEmpty { return name }
+        if let name, !name.isEmpty { return name }
+        return (provider ?? "Connection").replacingOccurrences(of: "_", with: " ").capitalized
+    }
+
+    var needsAttention: Bool { requiresUpdate == true || status == "requires_update" }
+    var isSyncing: Bool { sync?.syncing == true }
+    var lastSynced: Date? { SyncClock.date(sync?.lastSyncedAt) }
+    var lastSyncFailed: Bool {
+        guard let latest = sync?.latest else { return false }
+        return latest.status == "failed" || latest.status == "stale"
+    }
+}
+
+extension SyncRecord {
+    /// The newest sync of a connection, as the connections list gives it.
+    nonisolated struct Latest: Decodable, Sendable {
+        let status: String?
+        let completedAt: String?
+        let failedAt: String?
+    }
+}
+
+/// Reads Sure's sync times and says how long ago they were.
+nonisolated enum SyncClock {
+    static func date(_ text: String?) -> Date? {
+        guard let text else { return nil }
+        if let date = try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(text) {
+            return date
+        }
+        return try? Date.ISO8601FormatStyle().parse(text)
+    }
+
+    /// "just now", "5 min ago", "3 hr ago", "yesterday", "4 days ago".
+    static func ago(_ date: Date, now: Date = .now) -> String {
+        if now.timeIntervalSince(date) < 60 { return "just now" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        formatter.dateTimeStyle = .named
+        return formatter.localizedString(for: date, relativeTo: now)
+    }
+}
+
+/// How one account's syncing stands, from Sure's recent syncs.
+nonisolated struct AccountSyncStatus: Sendable, Hashable {
+    var lastSynced: Date?
+    var isSyncing = false
+    var lastFailed = false
+
+    /// "Synced 3 hr ago", "Syncing…", "Last sync failed", or nil if unknown.
+    var summary: String? {
+        if isSyncing { return "Syncing…" }
+        if lastFailed { return "Last sync failed" }
+        if let lastSynced { return "Synced \(SyncClock.ago(lastSynced))" }
+        return nil
+    }
+
+    /// Each account's status from a list of syncs, newest first.
+    ///
+    /// The newest sync says whether one is running, the newest finished one
+    /// whether it failed, and the newest completed one when it last worked.
+    static func byAccount(from syncs: [SyncRecord]) -> [String: AccountSyncStatus] {
+        var result: [String: AccountSyncStatus] = [:]
+        var seen: Set<String> = []
+        var sawFinished: Set<String> = []
+        for sync in syncs {
+            guard sync.syncable?.type == "Account", let id = sync.syncable?.id else { continue }
+            var status = result[id] ?? AccountSyncStatus()
+            if !seen.contains(id) {
+                seen.insert(id)
+                status.isSyncing = sync.isRunning
+            }
+            if sync.isFinished, !sawFinished.contains(id) {
+                sawFinished.insert(id)
+                status.lastFailed = sync.didFail
+            }
+            if status.lastSynced == nil, sync.status == "completed" {
+                status.lastSynced = SyncClock.date(sync.completedAt)
+            }
+            result[id] = status
+        }
+        return result
+    }
+}

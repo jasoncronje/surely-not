@@ -101,8 +101,12 @@ struct AccountDetailView: View {
     @State private var model: AccountDetailModel
     @State private var isAdding = false
 
-    init(client: APIClient, account: Account) {
+    /// How the account's syncing stood on the Accounts list, if known.
+    private let sync: AccountSyncStatus?
+
+    init(client: APIClient, account: Account, sync: AccountSyncStatus? = nil) {
         self.client = client
+        self.sync = sync
         _model = State(initialValue: AccountDetailModel(client: client, account: account))
     }
 
@@ -115,6 +119,13 @@ struct AccountDetailView: View {
                             .font(Theme.small)
                             .foregroundStyle(Theme.muted)
                         MoneyText(amount: model.account.balance)
+                        if let summary = sync?.summary {
+                            Label(summary, systemImage: sync?.lastFailed == true && sync?.isSyncing != true
+                                ? "exclamationmark.triangle" : "arrow.triangle.2.circlepath")
+                                .font(Theme.small)
+                                .foregroundStyle(sync?.lastFailed == true && sync?.isSyncing != true ? Theme.warning : Theme.muted)
+                                .padding(.top, 4)
+                        }
                     }
                     LoadableView(state: model.history, retry: model.loadHistory) { samples in
                         BalanceHistory(samples: samples, account: model.account)

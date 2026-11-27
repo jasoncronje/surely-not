@@ -257,6 +257,35 @@ extension APIClient {
         try await everyPage("accounts")
     }
 
+    /// The banks and services Sure pulls accounts from, with how syncing went.
+    func providerConnections() async throws -> [ProviderConnection] {
+        let list: DataList<ProviderConnection> = try await get("provider_connections")
+        return list.data
+    }
+
+    /// Sure's most recent syncs, newest first. Every household sync makes one
+    /// per account, so a couple of pages covers the latest of each.
+    func recentSyncs(pages: Int = 2) async throws -> [SyncRecord] {
+        var syncs: [SyncRecord] = []
+        for number in 1...max(pages, 1) {
+            let list: DataList<SyncRecord> = try await get("syncs", query: ["page": String(number), "per_page": "100"])
+            syncs += list.data
+            guard list.hasMore, !list.data.isEmpty else { break }
+        }
+        return syncs
+    }
+
+    /// Asks Sure to sync everything: every connection and account, then rules
+    /// and transfer matching. Sure joins a sync already running.
+    func startSync() async throws -> QueuedSync {
+        try await send("POST", "sync")
+    }
+
+    func sync(id: String) async throws -> SyncRecord? {
+        let item: DataItem<SyncRecord> = try await get("syncs/\(id)")
+        return item.data
+    }
+
     func balanceSheet() async throws -> BalanceSheet {
         try await get("balance_sheet")
     }
