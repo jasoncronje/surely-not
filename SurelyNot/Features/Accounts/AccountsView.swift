@@ -173,9 +173,6 @@ struct AccountsView: View {
             .screenBackground()
             .navigationTitle("Accounts")
             .navigationBarTitleDisplayMode(.inline)
-            .navigationDestination(for: Account.self) { account in
-                AccountDetailView(client: client, account: account)
-            }
             .refreshable { await model.load() }
             // Sure's API cannot make accounts, so this opens Sure's own page
             // for it. The list reloads when the page closes.
@@ -215,7 +212,12 @@ struct AccountsView: View {
                     if index > 0 {
                         RowRule(inset: .tile)
                     }
-                    NavigationLink(value: account) {
+                    // A view link like the rest of the app. A value link here
+                    // popped straight back: Accounts is itself pushed by a view
+                    // link from More, and SwiftUI drops value pushes on top of it.
+                    NavigationLink {
+                        AccountDetailView(client: client, account: account)
+                    } label: {
                         AccountRow(account: account)
                     }
                     .buttonStyle(RowButtonStyle())
